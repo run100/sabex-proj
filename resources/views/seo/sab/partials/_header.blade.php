@@ -36,6 +36,7 @@
     @endphp
     <div class="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:justify-end">
     <nav class="sab-main-nav flex gap-3 overflow-x-auto whitespace-nowrap pb-1 text-sm text-slate-300 md:flex-wrap md:gap-4 md:overflow-visible md:pb-0">
+      <a href="{{ \App\Support\SabHost::origin('trades') }}/" class="hover:text-cyan-300">Trades</a>
       <a href="{{ $urlPrefix }}/{{ \App\Services\Seo\SabRenderService::PAGE_TRADING_CALCULATOR }}" class="hover:text-cyan-300" style="display:inline-flex;align-items:flex-start;gap:.25rem">
         {{ $t['nav_calculator'] ?? 'Calculator' }}
         <span style="margin-top:.05rem;border-radius:9999px;background:#f43f5e;padding:.1rem .25rem;font-size:7px;line-height:1;font-weight:900;color:#fff;box-shadow:0 1px 4px rgba(76,5,25,.45)">HOT</span>

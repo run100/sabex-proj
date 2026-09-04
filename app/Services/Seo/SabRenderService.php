@@ -852,6 +852,127 @@ class SabRenderService
         return self::DEFAULT_LOCALE;
     }
 
+    /**
+     * Public origin for canonical / sitemap / robots on the www host.
+     * Production apex sabexistcount.com is normalized to www.
+     */
+    public function publicWwwOrigin(?SeoSite $site = null): string
+    {
+        if ($site === null) {
+            try {
+                $site = SeoSite::query()->where('slug', self::SITE_SLUG)->first();
+            } catch (\Throwable) {
+                $site = null;
+            }
+        }
+        $base = rtrim((string) ($site?->base_url ?: ''), '/');
+        if ($base !== '') {
+            return $this->normalizeWwwOrigin($base);
+        }
+
+        $host = (string) config('sab.hosts.www', 'www.sabexistcount.com');
+        $scheme = str_contains($host, '.lab') || str_contains($host, 'localhost') ? 'http' : 'https';
+
+        return $scheme.'://'.$host;
+    }
+
+    public function buildLiveSitemapXml(): string
+    {
+        $site = SeoSite::query()->where('slug', self::SITE_SLUG)->firstOrFail();
+        $game = SeoGame::query()
+            ->where('seo_site_id', $site->id)
+            ->where('slug', self::GAME_SLUG)
+            ->firstOrFail();
+        $baseUrl = $this->publicWwwOrigin($site);
+        $items = $this->loadItems($game);
+        $news = $this->loadPublishedNews($site);
+        $staticPages = $this->loadPublishedStaticPages($site);
+        $codesLastmod = (string) $this->codesData()['verified_at'];
+        $urls = [];
+
+        foreach (self::HOME_LOCALES as $locale) {
+            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, 'index.html'), 'priority' => '1.0'];
+            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_EXIST_COUNTS_LIST), 'priority' => '0.85'];
+            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_VALUE_LIST), 'priority' => '0.85'];
+            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_TRADING_CALCULATOR), 'priority' => '0.85'];
+            $urls[] = [
+                'loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_CODES),
+                'priority' => '0.9',
+                'lastmod' => $codesLastmod,
+            ];
+            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::gamesIndexPublicPath()), 'priority' => '0.75'];
+            foreach (array_keys(self::gamesCatalog()) as $gameSlug) {
+                $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::gamePublicPath($gameSlug)), 'priority' => '0.7'];
+            }
+        }
+
+        $en = self::DEFAULT_LOCALE;
+        $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $en, self::PAGE_EXIST_COUNT_GALLERY), 'priority' => '0.8'];
+        $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $en, self::PAGE_VALUE_CHANGES), 'priority' => '0.85'];
+        $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $en, self::PAGE_WIKI), 'priority' => '0.85'];
+        foreach (SabWikiPageDefinitions::shippingPageSlugs() as $slug) {
+            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $en, $slug), 'priority' => '0.8'];
+        }
+        $urls[] = [
+            'loc' => $this->localePublicUrl($baseUrl, $en, 'news'),
+            'priority' => '0.75',
+            'lastmod' => optional($news->where('locale', $en)->sortByDesc('updated_at')->first())->updated_at?->toDateString(),
+        ];
+
+        foreach ($items->filter(fn (SeoItem $item) => self::shouldRenderProductHtml($item) && self::shouldIndexProductSlug((string) $item->slug)) as $item) {
+            $urls[] = [
+                'loc' => $this->localePublicUrl($baseUrl, $en, 'products/'.self::productPublicSlug($item->slug)),
+                'priority' => '0.8',
+                'lastmod' => optional($item->updated_at)->toDateString(),
+            ];
+        }
+
+        foreach ($news->where('locale', $en) as $article) {
+            $urls[] = [
+                'loc' => $this->localePublicUrl($baseUrl, $en, 'news/'.$article->slug),
+                'priority' => '0.7',
+                'lastmod' => optional($article->updated_at)->toDateString(),
+            ];
+        }
+
+        $legalSlugs = ['about-us', 'privacy-policy', 'terms-of-service'];
+        $staticBySlug = $staticPages->keyBy('slug');
+        foreach ($legalSlugs as $legalSlug) {
+            $article = $staticBySlug->get($legalSlug);
+            $urls[] = [
+                'loc' => $this->localePublicUrl($baseUrl, $en, $legalSlug),
+                'priority' => '0.5',
+                'lastmod' => optional($article?->updated_at)->toDateString(),
+            ];
+        }
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
+        foreach ($urls as $u) {
+            $xml .= "  <url>\n    <loc>".htmlspecialchars((string) $u['loc'], ENT_XML1)."</loc>\n";
+            if (! empty($u['lastmod'])) {
+                $xml .= '    <lastmod>'.$u['lastmod']."</lastmod>\n";
+            }
+            $xml .= '    <priority>'.$u['priority']."</priority>\n  </url>\n";
+        }
+        $xml .= '</urlset>';
+
+        return $xml;
+    }
+
+    private function normalizeWwwOrigin(string $origin): string
+    {
+        $parts = parse_url($origin);
+        $scheme = $parts['scheme'] ?? 'https';
+        $host = $parts['host'] ?? '';
+        $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+        if ($host === 'sabexistcount.com') {
+            $host = 'www.sabexistcount.com';
+        }
+
+        return $scheme.'://'.$host.$port;
+    }
+
     public static function normalizeLocale(?string $locale): string
     {
         $locale = trim((string) $locale);

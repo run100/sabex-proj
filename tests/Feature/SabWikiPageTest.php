@@ -452,23 +452,39 @@ class SabWikiPageTest extends TestCase
         $response = $this->get('/sitemap.xml');
         $response->assertOk();
         $sitemap = (string) $response->getContent();
-        $this->assertSame(1, substr_count($sitemap, '<loc>https://sabexistcount.com/wiki</loc>'));
+        $origin = 'https://www.sabexistcount.com';
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/wiki</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/sab-exist-count-list</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/pt/sab-exist-count-list</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/sab-value-list</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/steal-a-brainrot-trading-calculator</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/steal-a-brainrot-codes</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/games</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/exist-count-gallery</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/value-changes</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/news</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/products/rendered-brainrot</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/about-us</loc>'));
         foreach (SabWikiPageDefinitions::shippingPageSlugs() as $slug) {
-            $this->assertSame(1, substr_count($sitemap, '<loc>https://sabexistcount.com/'.$slug.'</loc>'));
+            $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/'.$slug.'</loc>'));
         }
         foreach (SabWikiPageDefinitions::topicPageSlugs() as $slug) {
             if (in_array($slug, SabWikiPageDefinitions::shippingTopicPageSlugs(), true)) {
                 continue;
             }
-            $this->assertStringNotContainsString('https://sabexistcount.com/'.$slug.'</loc>', $sitemap);
+            $this->assertStringNotContainsString($origin.'/'.$slug.'</loc>', $sitemap);
         }
         $this->assertStringNotContainsString('/wiki.html</loc>', $sitemap);
         $this->assertStringNotContainsString('/wiki/brainrots', $sitemap);
         $this->assertStringNotContainsString('/wiki/events', $sitemap);
         $this->assertStringNotContainsString('/wiki/admin-event', $sitemap);
-        $this->assertStringNotContainsString('https://sabexistcount.com/all-rebirths</loc>', $sitemap);
+        $this->assertStringNotContainsString($origin.'/all-rebirths</loc>', $sitemap);
         $this->assertStringNotContainsString('/wiki/rebirths</loc>', $sitemap);
         $this->assertStringNotContainsString('/j8xq-4n2m-w9kp', $sitemap);
+        $this->assertStringNotContainsString('x.sabex.lab', $sitemap);
+        $this->assertStringNotContainsString('x.sabexistcount.com', $sitemap);
+        $this->assertStringNotContainsString('trades.sabexistcount.com', $sitemap);
     }
 
     public function test_rarity_pages_do_not_mix_tiers_and_keep_other_on_catalog_only(): void

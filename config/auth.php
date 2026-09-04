@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\TradeUser;
 use App\Models\User;
 
 return [
@@ -42,6 +43,10 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        'trades' => [
+            'driver' => 'session',
+            'provider' => 'trade_users',
+        ],
     ],
 
     /*
@@ -65,6 +70,10 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
+        ],
+        'trade_users' => [
+            'driver' => 'eloquent',
+            'model' => TradeUser::class,
         ],
 
         // 'users' => [

@@ -76,7 +76,7 @@
 
 <link rel="stylesheet" href="{{ $cssHref ?? \App\Services\Seo\SabRenderService::CSS_HREF_LARAVEL }}" />
 
-{!! $websiteJsonLd !!}
+{!! $websiteJsonLd ?? '' !!}
 @isset($jsonLd)
 {!! $jsonLd !!}
 @endisset

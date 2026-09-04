@@ -28,6 +28,15 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'roblox' => [
+        'client_id' => env('ROBLOX_CLIENT_ID'),
+        'client_secret' => env('ROBLOX_CLIENT_SECRET'),
+        'redirect' => env('ROBLOX_REDIRECT_URI', 'http://trades.sabex.lab/auth/roblox/callback'),
+        'authorize' => 'https://apis.roblox.com/oauth/v1/authorize',
+        'token' => 'https://apis.roblox.com/oauth/v1/token',
+        'userinfo' => 'https://apis.roblox.com/oauth/v1/userinfo',
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

@@ -101,31 +101,19 @@ class SabPublicController extends Controller
         return view('seo.sab.static-page', $sabRender->staticPagePreviewContext($legalSlug));
     }
 
-    public function robots(): Response
+    public function robots(SabRenderService $sabRender): Response
     {
         $template = trim((string) file_get_contents(resource_path('seo/sab/robots.txt.stub')));
-        $body = str_replace('{{ base_url }}', rtrim((string) config('app.url'), '/'), $template);
+        $body = str_replace('{{ base_url }}', $sabRender->publicWwwOrigin(), $template);
 
         return response($body, 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
     }
 
     public function sitemap(SabRenderService $sabRender): Response
     {
-        $payload = $sabRender->homeViewContext();
-        $baseUrl = rtrim((string) ($payload['baseUrl'] ?? config('app.url')), '/');
-        $locs = [$baseUrl.'/', $baseUrl.'/wiki'];
-        foreach (SabWikiPageDefinitions::shippingPageSlugs() as $slug) {
-            $locs[] = $baseUrl.'/'.$slug;
-        }
-
-        $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n";
-        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
-        foreach ($locs as $loc) {
-            $xml .= '  <url><loc>'.htmlspecialchars($loc, ENT_XML1).'</loc></url>'."\n";
-        }
-        $xml .= '</urlset>';
-
-        return response($xml, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
+        return response($sabRender->buildLiveSitemapXml(), 200, [
+            'Content-Type' => 'application/xml; charset=UTF-8',
+        ]);
     }
 
     private function locale(Request $request, ?string $routeLocale = null): string
