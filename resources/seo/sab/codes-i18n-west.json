@@ -1,0 +1,344 @@
+{
+  "pt": {
+    "meta_title": "Códigos de Steal a Brainrot ({month}) - Códigos ativos e recompensas",
+    "meta_description": "Encontre códigos ativos de Steal a Brainrot, recompensas de códigos DLC de uso único, códigos expirados, instruções de resgate e soluções para códigos que não funcionam.",
+    "breadcrumb_home": "Início",
+    "breadcrumb_codes": "Códigos",
+    "eyebrow": "Lista de códigos verificada manualmente",
+    "h1": "Códigos de Steal a Brainrot ({month})",
+    "hero_intro": "Use os códigos mais recentes de Steal a Brainrot que ainda funcionam, confira quais códigos com estoque limitado expiraram e entenda a diferença entre códigos DLC de uso único e códigos públicos.",
+    "active_count": "Códigos públicos ativos: {active_count}",
+    "updated_label": "Atualizado: busca por novos códigos em {verified_date}",
+    "expired_count": "Códigos expirados arquivados: {expired_count}",
+    "active_title": "Códigos públicos ativos de Steal a Brainrot",
+    "active_intro": "Estes são códigos públicos que vários jogadores podem tentar usar. Códigos com estoque limitado podem parar de funcionar sem aviso, portanto resgate-os rapidamente e confira a data de verificação acima.",
+    "active_status": "Ativo",
+    "reward_label": "Recompensa:",
+    "copy_code": "Copiar código",
+    "copied": "Copiado",
+    "copy_aria": "Copiar o código {code}",
+    "active_entry_note": "Faz La Vacca Saturno Saturnita aparecer no Red Carpet. Fique perto da entrada do túnel e tenha $80M disponíveis para comprá-la.",
+    "active_warning": "Um código que faz um Brainrot aparecer não o adiciona automaticamente à sua base. Para BESTBRAINROTEVER, fique perto do túnel do Red Carpet e tenha dinheiro suficiente no jogo antes de resgatar o código.",
+    "dlc_title": "DLC / Códigos aleatórios de uso único",
+    "dlc_description": "Um DLC ou produto elegível pode incluir um código exclusivo, gerado individualmente e de uso único. O código não é público, e seu resgate concede um resultado do conjunto de recompensas documentado.",
+    "dlc_no_public": "Não há um código público para copiar nesta seção.",
+    "dlc_explanation": "A indicação “(randomly generated code)” na Wiki significa que o comprador recebe uma sequência exclusiva. A recompensa é selecionada entre as opções abaixo. As probabilidades não foram publicadas.",
+    "dlc_pool_aria": "Possíveis recompensas dos códigos DLC",
+    "generator_warning": "Não informe sua senha do Roblox em sites que prometem gerar códigos. O resgate legítimo acontece dentro de Steal a Brainrot, e um código DLC privado não pode ser gerado a partir do seu nome de usuário.",
+    "expired_title": "Códigos expirados de Steal a Brainrot",
+    "expired_intro": "Estes códigos públicos ou com estoque limitado não aparecem mais como disponíveis na verificação combinada mais recente. O arquivo ajuda a confirmar se um código encontrado em um vídeo ou publicação antiga já terminou.",
+    "expired_code_header": "Código expirado",
+    "former_reward_header": "Recompensa anterior",
+    "status_header": "Status",
+    "expired_status": "Expirado / indisponível",
+    "redeem_title": "Como resgatar códigos de Steal a Brainrot",
+    "redeem_intro": "Os códigos são resgatados dentro da experiência no Roblox. A interface de códigos possui um botão próprio no lado esquerdo da tela do jogo.",
+    "redeem_step_1_before": "Abra a experiência oficial ",
+    "redeem_step_1_link": "Steal a Brainrot no Roblox",
+    "redeem_step_1_after": " e entre em um servidor.",
+    "redeem_step_2_before": "Selecione o botão ",
+    "redeem_step_2_after": " no lado esquerdo da tela.",
+    "redeem_step_3": "Cole o código exatamente como ele aparece. Remova espaços antes ou depois do código.",
+    "redeem_step_4_before": "Pressione ",
+    "redeem_step_4_after": ". Se a recompensa aparecer no Red Carpet, vá até lá imediatamente e compre-a antes de outro jogador.",
+    "redeem_image_alt": "Painel de resgate de códigos de Steal a Brainrot com o botão Codes e o campo Submit",
+    "redeem_image_caption": "Interface de códigos dentro de Steal a Brainrot com o botão Codes destacado.",
+    "not_working_title": "Por que meu código de Steal a Brainrot não funciona?",
+    "not_working_items": [
+      {
+        "title": "Expirou ou esgotou:",
+        "body": "Muitos códigos de SAB possuem estoque limitado em vez de uma data fixa de encerramento."
+      },
+      {
+        "title": "Já foi resgatado:",
+        "body": "Códigos públicos normalmente permitem um resgate por conta, enquanto códigos DLC geralmente são de uso único."
+      },
+      {
+        "title": "A grafia está incorreta:",
+        "body": "Copie exatamente a sequência em letras maiúsculas e remova espaços ocultos."
+      },
+      {
+        "title": "O servidor está desatualizado:",
+        "body": "Entre novamente em um servidor atualizado após uma atualização do jogo e tente mais uma vez."
+      },
+      {
+        "title": "Você não conseguiu coletar a recompensa:",
+        "body": "Um Brainrot que aparece no Red Carpet ainda exige dinheiro suficiente e pode ser comprado por outro jogador."
+      }
+    ],
+    "more_codes_title": "Como encontrar mais códigos de Steal a Brainrot",
+    "more_codes_before_wiki": "Confira a experiência oficial no Roblox e seus links sociais atuais durante atualizações, eventos Admin Abuse e lançamentos limitados. A ",
+    "more_codes_after_wiki": " mantém o arquivo da comunidade, enquanto esta página separa códigos públicos de códigos DLC privados.",
+    "trading_before_calculator": "Antes de trocar uma recompensa, compare-a na ",
+    "trading_between_calculator_exist": ", consulte sua disponibilidade na ",
+    "trading_between_exist_value": " e confira a demanda atual na ",
+    "trading_after_value": ".",
+    "faq_title": "Perguntas frequentes sobre códigos de Steal a Brainrot",
+    "faq_items": [
+      {
+        "question": "Qual é o código ativo de Steal a Brainrot em {month}?",
+        "answer": "Na verificação mais recente, o código público ativo é BESTBRAINROTEVER, que faz La Vacca Saturno Saturnita aparecer no Red Carpet."
+      },
+      {
+        "question": "O que significa randomly generated code em Steal a Brainrot?",
+        "answer": "Significa que a compra de um DLC ou produto elegível pode incluir um código exclusivo e de uso único. Ele não é um código público, e sua recompensa é selecionada entre as opções documentadas."
+      },
+      {
+        "question": "Por que meu código de Steal a Brainrot não funciona?",
+        "answer": "O código pode ter expirado, esgotado, já ter sido resgatado, ter sido digitado com letras incorretas ou conter um espaço extra. Códigos DLC de uso único também deixam de funcionar após um resgate bem-sucedido."
+      },
+      {
+        "question": "Os códigos de Steal a Brainrot diferenciam maiúsculas de minúsculas?",
+        "answer": "Considere os códigos sensíveis a maiúsculas e minúsculas e copie exatamente a grafia em letras maiúsculas mostrada na lista de códigos ativos."
+      },
+      {
+        "question": "Onde posso encontrar novos códigos de Steal a Brainrot?",
+        "answer": "Confira a experiência oficial no Roblox e seus links sociais atuais, a página de códigos da Wiki da comunidade e esta página após atualizações do jogo ou eventos Admin Abuse."
+      }
+    ],
+    "sidebar_aria": "Navegação da página de códigos",
+    "sidebar_on_page": "Nesta página",
+    "sidebar_active": "Códigos públicos ativos",
+    "sidebar_dlc": "Códigos DLC aleatórios",
+    "sidebar_expired": "Códigos expirados",
+    "sidebar_redeem": "Como resgatar",
+    "sidebar_not_working": "Códigos que não funcionam",
+    "sidebar_faq": "Perguntas frequentes",
+    "sidebar_related": "Ferramentas relacionadas de SAB",
+    "sidebar_calculator": "Calculadora de trocas",
+    "sidebar_exist": "Lista de Exist Counts",
+    "sidebar_value": "Lista de valores",
+    "sidebar_news": "Notícias da atualização mais recente",
+    "sidebar_source": "Verificação da fonte",
+    "sidebar_checked_before_date": "Verificado em ",
+    "sidebar_checked_after_date": " com base no registro atual da Wiki da comunidade."
+  },
+  "es": {
+    "meta_title": "Códigos de Steal a Brainrot ({month}) - Códigos activos y recompensas",
+    "meta_description": "Encuentra códigos activos de Steal a Brainrot, recompensas de códigos DLC de un solo uso, códigos caducados, pasos para canjearlos y soluciones para los códigos que no funcionan.",
+    "breadcrumb_home": "Inicio",
+    "breadcrumb_codes": "Códigos",
+    "eyebrow": "Lista de códigos comprobada manualmente",
+    "h1": "Códigos de Steal a Brainrot ({month})",
+    "hero_intro": "Usa los códigos más recientes de Steal a Brainrot que todavía funcionan, comprueba qué códigos con existencias limitadas han caducado y conoce la diferencia entre los códigos DLC de un solo uso y los códigos públicos.",
+    "active_count": "Códigos públicos activos: {active_count}",
+    "updated_label": "Actualizado: búsqueda de nuevos códigos realizada el {verified_date}",
+    "expired_count": "Códigos caducados archivados: {expired_count}",
+    "active_title": "Códigos públicos activos de Steal a Brainrot",
+    "active_intro": "Estos son códigos públicos que varios jugadores pueden intentar usar. Los códigos con existencias limitadas pueden dejar de funcionar sin aviso, así que canjéalos cuanto antes y consulta la fecha de verificación indicada arriba.",
+    "active_status": "Activo",
+    "reward_label": "Recompensa:",
+    "copy_code": "Copiar código",
+    "copied": "Copiado",
+    "copy_aria": "Copiar el código {code}",
+    "active_entry_note": "Hace que La Vacca Saturno Saturnita aparezca en el Red Carpet. Quédate cerca de la entrada del túnel y ten $80M disponibles para comprarla.",
+    "active_warning": "Un código que hace aparecer un Brainrot no lo añade automáticamente a tu base. Para BESTBRAINROTEVER, quédate cerca del túnel del Red Carpet y ten suficiente dinero del juego antes de canjear el código.",
+    "dlc_title": "DLC / Códigos aleatorios de un solo uso",
+    "dlc_description": "Un DLC o producto compatible puede incluir un código único, generado individualmente y de un solo uso. El código no es público, y al canjearlo se obtiene uno de los resultados del conjunto de recompensas documentado.",
+    "dlc_no_public": "No hay ningún código público que copiar en esta sección.",
+    "dlc_explanation": "La indicación “(randomly generated code)” de la Wiki significa que el comprador recibe una cadena única. La recompensa se selecciona entre las opciones que aparecen abajo. Las probabilidades no se han publicado.",
+    "dlc_pool_aria": "Posibles recompensas de los códigos DLC",
+    "generator_warning": "No introduzcas tu contraseña de Roblox en una página que prometa generar códigos. El canje legítimo se realiza dentro de Steal a Brainrot, y un código DLC privado no puede generarse a partir de tu nombre de usuario.",
+    "expired_title": "Códigos caducados de Steal a Brainrot",
+    "expired_intro": "Estos códigos públicos o con existencias limitadas ya no aparecen como disponibles en la comprobación combinada más reciente. El archivo permite confirmar si un código encontrado en un vídeo o una publicación antigua ya ha terminado.",
+    "expired_code_header": "Código caducado",
+    "former_reward_header": "Recompensa anterior",
+    "status_header": "Estado",
+    "expired_status": "Caducado / no disponible",
+    "redeem_title": "Cómo canjear códigos de Steal a Brainrot",
+    "redeem_intro": "Los códigos se canjean dentro de la experiencia de Roblox. La interfaz de códigos tiene su propio botón en el lado izquierdo de la pantalla del juego.",
+    "redeem_step_1_before": "Abre la experiencia oficial ",
+    "redeem_step_1_link": "Steal a Brainrot en Roblox",
+    "redeem_step_1_after": " y entra en un servidor.",
+    "redeem_step_2_before": "Selecciona el botón ",
+    "redeem_step_2_after": " en el lado izquierdo de la pantalla.",
+    "redeem_step_3": "Pega el código exactamente como aparece. Elimina cualquier espacio situado antes o después del código.",
+    "redeem_step_4_before": "Pulsa ",
+    "redeem_step_4_after": ". Si la recompensa aparece en el Red Carpet, ve allí inmediatamente y cómprala antes que otro jugador.",
+    "redeem_image_alt": "Panel para canjear códigos de Steal a Brainrot con el botón Codes y el campo Submit",
+    "redeem_image_caption": "Interfaz de códigos dentro de Steal a Brainrot con el botón Codes resaltado.",
+    "not_working_title": "¿Por qué no funciona mi código de Steal a Brainrot?",
+    "not_working_items": [
+      {
+        "title": "Ha caducado o se ha agotado:",
+        "body": "Muchos códigos de SAB tienen existencias limitadas en lugar de una fecha fija de finalización."
+      },
+      {
+        "title": "Ya se ha canjeado:",
+        "body": "Los códigos públicos normalmente permiten un canje por cuenta, mientras que los códigos DLC suelen ser de un solo uso."
+      },
+      {
+        "title": "La escritura es incorrecta:",
+        "body": "Copia exactamente la cadena en mayúsculas y elimina los espacios ocultos."
+      },
+      {
+        "title": "El servidor está desactualizado:",
+        "body": "Vuelve a entrar en un servidor actualizado después de una actualización del juego e inténtalo una vez más."
+      },
+      {
+        "title": "No has podido recoger la recompensa:",
+        "body": "Un Brainrot que aparece en el Red Carpet todavía requiere suficiente dinero y otro jugador puede comprarlo antes."
+      }
+    ],
+    "more_codes_title": "Cómo encontrar más códigos de Steal a Brainrot",
+    "more_codes_before_wiki": "Consulta la experiencia oficial de Roblox y sus enlaces sociales actuales durante actualizaciones, eventos Admin Abuse y lanzamientos limitados. La ",
+    "more_codes_after_wiki": " mantiene el archivo de la comunidad, mientras que esta página separa los códigos públicos de los códigos DLC privados.",
+    "trading_before_calculator": "Antes de intercambiar una recompensa, compárala en la ",
+    "trading_between_calculator_exist": ", consulta sus existencias en la ",
+    "trading_between_exist_value": " y comprueba la demanda actual en la ",
+    "trading_after_value": ".",
+    "faq_title": "Preguntas frecuentes sobre los códigos de Steal a Brainrot",
+    "faq_items": [
+      {
+        "question": "¿Cuál es el código activo de Steal a Brainrot en {month}?",
+        "answer": "En la comprobación más reciente, el código público activo es BESTBRAINROTEVER, que hace que La Vacca Saturno Saturnita aparezca en el Red Carpet."
+      },
+      {
+        "question": "¿Qué significa randomly generated code en Steal a Brainrot?",
+        "answer": "Significa que la compra de un DLC o producto compatible puede incluir un código único y de un solo uso. No es un código público, y su recompensa se selecciona entre las opciones documentadas."
+      },
+      {
+        "question": "¿Por qué no funciona mi código de Steal a Brainrot?",
+        "answer": "El código puede haber caducado, haberse agotado, haberse canjeado ya, haberse introducido con mayúsculas incorrectas o contener un espacio adicional. Los códigos DLC de un solo uso también dejan de funcionar después de un canje correcto."
+      },
+      {
+        "question": "¿Los códigos de Steal a Brainrot distinguen entre mayúsculas y minúsculas?",
+        "answer": "Considera que los códigos distinguen entre mayúsculas y minúsculas y copia exactamente la escritura en mayúsculas que aparece en la lista de códigos activos."
+      },
+      {
+        "question": "¿Dónde puedo encontrar nuevos códigos de Steal a Brainrot?",
+        "answer": "Consulta la experiencia oficial de Roblox y sus enlaces sociales actuales, la página de códigos de la Wiki de la comunidad y esta página después de las actualizaciones del juego o los eventos Admin Abuse."
+      }
+    ],
+    "sidebar_aria": "Navegación de la página de códigos",
+    "sidebar_on_page": "En esta página",
+    "sidebar_active": "Códigos públicos activos",
+    "sidebar_dlc": "Códigos DLC aleatorios",
+    "sidebar_expired": "Códigos caducados",
+    "sidebar_redeem": "Cómo canjearlos",
+    "sidebar_not_working": "Códigos que no funcionan",
+    "sidebar_faq": "Preguntas frecuentes",
+    "sidebar_related": "Herramientas relacionadas de SAB",
+    "sidebar_calculator": "Calculadora de intercambios",
+    "sidebar_exist": "Lista de Exist Counts",
+    "sidebar_value": "Lista de valores",
+    "sidebar_news": "Noticias de la última actualización",
+    "sidebar_source": "Comprobación de la fuente",
+    "sidebar_checked_before_date": "Comprobado el ",
+    "sidebar_checked_after_date": " con el registro actual de la Wiki de la comunidad."
+  },
+  "de": {
+    "meta_title": "Steal a Brainrot Codes ({month}) - Aktive Codes und Belohnungen",
+    "meta_description": "Finde aktive Steal a Brainrot Codes, Belohnungen aus einmalig nutzbaren DLC-Codes, abgelaufene Codes, Einlöseschritte und Lösungen für nicht funktionierende Codes.",
+    "breadcrumb_home": "Startseite",
+    "breadcrumb_codes": "Codes",
+    "eyebrow": "Manuell geprüfte Code-Liste",
+    "h1": "Steal a Brainrot Codes ({month})",
+    "hero_intro": "Nutze die neuesten funktionierenden Steal a Brainrot Codes, prüfe, welche Codes mit begrenztem Vorrat abgelaufen sind, und erfahre, wie sich einmalig nutzbare DLC-Codes von öffentlichen Codes unterscheiden.",
+    "active_count": "Aktive öffentliche Codes: {active_count}",
+    "updated_label": "Aktualisiert: Am {verified_date} nach neuen Codes gesucht",
+    "expired_count": "Archivierte abgelaufene Codes: {expired_count}",
+    "active_title": "Aktive öffentliche Steal a Brainrot Codes",
+    "active_intro": "Diese öffentlichen Codes können von mehreren Spielern ausprobiert werden. Codes mit begrenztem Vorrat können ohne Vorwarnung ungültig werden. Löse sie daher zeitnah ein und beachte das oben angegebene Prüfdatum.",
+    "active_status": "Aktiv",
+    "reward_label": "Belohnung:",
+    "copy_code": "Code kopieren",
+    "copied": "Kopiert",
+    "copy_aria": "Code {code} kopieren",
+    "active_entry_note": "Lässt La Vacca Saturno Saturnita auf dem Red Carpet erscheinen. Bleibe in der Nähe des Tunneleingangs und halte $80M bereit, um sie zu kaufen.",
+    "active_warning": "Ein Code, der einen Brainrot erscheinen lässt, fügt ihn nicht automatisch deiner Basis hinzu. Bleibe bei BESTBRAINROTEVER in der Nähe des Red-Carpet-Tunnels und halte vor dem Einlösen genügend Spielgeld bereit.",
+    "dlc_title": "DLC / Einmalig nutzbare Zufallscodes",
+    "dlc_description": "Ein berechtigtes DLC- oder Merchandise-Produkt kann einen individuell generierten, einmalig nutzbaren Code enthalten. Der Code ist nicht öffentlich, und beim Einlösen wird eine Belohnung aus dem dokumentierten Belohnungspool vergeben.",
+    "dlc_no_public": "In diesem Abschnitt gibt es keinen öffentlichen Code zum Kopieren.",
+    "dlc_explanation": "Die Wiki-Angabe “(randomly generated code)” bedeutet, dass der Käufer eine individuelle Zeichenfolge erhält. Die Belohnung wird anschließend aus dem unten aufgeführten Pool ausgewählt. Veröffentlichte Wahrscheinlichkeiten sind nicht verfügbar.",
+    "dlc_pool_aria": "Mögliche Belohnungen aus DLC-Codes",
+    "generator_warning": "Gib dein Roblox-Passwort nicht auf einer Website ein, die Codes zu generieren verspricht. Die legitime Einlösung findet innerhalb von Steal a Brainrot statt, und ein privater DLC-Code kann nicht aus deinem Benutzernamen generiert werden.",
+    "expired_title": "Abgelaufene Steal a Brainrot Codes",
+    "expired_intro": "Diese öffentlichen Codes oder Codes mit begrenztem Vorrat werden in der neuesten kombinierten Quellenprüfung nicht mehr als verfügbar geführt. Das Archiv hilft festzustellen, ob ein Code aus einem älteren Video oder Beitrag bereits beendet ist.",
+    "expired_code_header": "Abgelaufener Code",
+    "former_reward_header": "Frühere Belohnung",
+    "status_header": "Status",
+    "expired_status": "Abgelaufen / nicht verfügbar",
+    "redeem_title": "So löst du Steal a Brainrot Codes ein",
+    "redeem_intro": "Codes werden innerhalb der Roblox-Erfahrung eingelöst. Die Code-Oberfläche hat eine eigene Schaltfläche auf der linken Seite des Spielbildschirms.",
+    "redeem_step_1_before": "Öffne die offizielle ",
+    "redeem_step_1_link": "Steal a Brainrot Roblox-Erfahrung",
+    "redeem_step_1_after": " und tritt einem Server bei.",
+    "redeem_step_2_before": "Wähle die Schaltfläche ",
+    "redeem_step_2_after": " auf der linken Bildschirmseite aus.",
+    "redeem_step_3": "Füge den Code genau wie angegeben ein. Entferne Leerzeichen vor oder nach dem Code.",
+    "redeem_step_4_before": "Drücke ",
+    "redeem_step_4_after": ". Wenn die Belohnung auf dem Red Carpet erscheint, gehe sofort dorthin und kaufe sie, bevor es ein anderer Spieler tut.",
+    "redeem_image_alt": "Einlösefenster für Steal a Brainrot Codes mit der Schaltfläche Codes und dem Submit-Feld",
+    "redeem_image_caption": "Code-Oberfläche in Steal a Brainrot mit hervorgehobener Codes-Schaltfläche.",
+    "not_working_title": "Warum funktioniert mein Steal a Brainrot Code nicht?",
+    "not_working_items": [
+      {
+        "title": "Er ist abgelaufen oder ausverkauft:",
+        "body": "Viele SAB-Codes haben einen begrenzten Vorrat statt eines festen Endzeitpunkts."
+      },
+      {
+        "title": "Er wurde bereits eingelöst:",
+        "body": "Öffentliche Codes können normalerweise einmal pro Konto eingelöst werden, während DLC-Codes in der Regel nur einmal nutzbar sind."
+      },
+      {
+        "title": "Die Schreibweise ist falsch:",
+        "body": "Kopiere die Zeichenfolge exakt in Großbuchstaben und entferne versteckte Leerzeichen."
+      },
+      {
+        "title": "Der Server ist veraltet:",
+        "body": "Tritt nach einem Spielupdate einem aktuellen Server bei und versuche es erneut."
+      },
+      {
+        "title": "Du kannst die Belohnung nicht erhalten:",
+        "body": "Ein auf dem Red Carpet erscheinender Brainrot erfordert weiterhin genügend Geld und kann von einem anderen Spieler gekauft werden."
+      }
+    ],
+    "more_codes_title": "So findest du weitere Steal a Brainrot Codes",
+    "more_codes_before_wiki": "Prüfe rund um Updates, Admin Abuse Events und limitierte Veröffentlichungen die offizielle Roblox-Erfahrung und ihre aktuellen Social-Media-Links. Die ",
+    "more_codes_after_wiki": " pflegt das Community-Archiv, während diese Seite öffentliche Codes von privaten DLC-Codes trennt.",
+    "trading_before_calculator": "Vergleiche eine Belohnung vor einem Tausch im ",
+    "trading_between_calculator_exist": ", prüfe ihren Bestand in der ",
+    "trading_between_exist_value": " und kontrolliere die aktuelle Nachfrage in der ",
+    "trading_after_value": ".",
+    "faq_title": "Häufig gestellte Fragen zu Steal a Brainrot Codes",
+    "faq_items": [
+      {
+        "question": "Welcher Steal a Brainrot Code ist im {month} aktiv?",
+        "answer": "Bei der letzten Prüfung war BESTBRAINROTEVER der aktive öffentliche Code. Er lässt La Vacca Saturno Saturnita auf dem Red Carpet erscheinen."
+      },
+      {
+        "question": "Was bedeutet randomly generated code in Steal a Brainrot?",
+        "answer": "Das bedeutet, dass der Kauf eines berechtigten DLC- oder Merchandise-Produkts einen individuellen, einmalig nutzbaren Code enthalten kann. Es handelt sich nicht um einen öffentlichen Code, und seine Belohnung wird aus dem dokumentierten Belohnungspool ausgewählt."
+      },
+      {
+        "question": "Warum funktioniert mein Steal a Brainrot Code nicht?",
+        "answer": "Der Code kann abgelaufen, ausverkauft, bereits eingelöst, mit falscher Groß- und Kleinschreibung eingegeben oder mit einem zusätzlichen Leerzeichen eingefügt worden sein. Einmalig nutzbare DLC-Codes funktionieren nach einer erfolgreichen Einlösung ebenfalls nicht mehr."
+      },
+      {
+        "question": "Muss bei Steal a Brainrot Codes die Groß- und Kleinschreibung beachtet werden?",
+        "answer": "Behandle die Codes als abhängig von der Groß- und Kleinschreibung und kopiere exakt die in der aktiven Liste angegebene Schreibweise in Großbuchstaben."
+      },
+      {
+        "question": "Wo finde ich neue Steal a Brainrot Codes?",
+        "answer": "Prüfe die offizielle Roblox-Erfahrung und ihre aktuellen Social-Media-Links, die Codes-Seite des Community-Wikis sowie diese Seite nach Spielupdates oder Admin Abuse Events."
+      }
+    ],
+    "sidebar_aria": "Navigation der Codes-Seite",
+    "sidebar_on_page": "Auf dieser Seite",
+    "sidebar_active": "Aktive öffentliche Codes",
+    "sidebar_dlc": "DLC-Zufallscodes",
+    "sidebar_expired": "Abgelaufene Codes",
+    "sidebar_redeem": "Codes einlösen",
+    "sidebar_not_working": "Codes funktionieren nicht",
+    "sidebar_faq": "FAQ",
+    "sidebar_related": "Verwandte SAB-Tools",
+    "sidebar_calculator": "Trading Calculator",
+    "sidebar_exist": "Exist Count List",
+    "sidebar_value": "Value List",
+    "sidebar_news": "Neueste Update-News",
+    "sidebar_source": "Quellenprüfung",
+    "sidebar_checked_before_date": "Geprüft am ",
+    "sidebar_checked_after_date": " anhand des aktuellen Eintrags im Community-Wiki."
+  }
+}

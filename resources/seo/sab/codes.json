@@ -1,0 +1,136 @@
+{
+    "verified_at": "2026-08-01",
+    "wiki_url": "https://stealabrainrot.fandom.com/wiki/Codes",
+    "wiki_label": "Steal a Brainrot Wiki Codes",
+    "active": [
+        {
+            "code": "BESTBRAINROTEVER",
+            "reward": "La Vacca Saturno Saturnita",
+            "reward_slug": "la-vacca-saturno-saturnita",
+            "reward_image": "/uploads/images/sab/codes/rewards/la-vacca-saturno-saturnita.webp",
+            "note": "Spawns La Vacca Saturno Saturnita on the Red Carpet. Stand near the tunnel entrance and keep $80M available to buy it."
+        }
+    ],
+    "random_dlc": {
+        "label": "DLC / Single-use Random Codes",
+        "description": "Eligible DLC or merchandise may include a uniquely generated, single-use code. The code itself is not public, and redeeming it awards one result from the documented reward pool.",
+        "possible_rewards": [
+            {
+                "name": "2x Luck",
+                "wiki_url": "https://stealabrainrot.fandom.com/wiki/Luck"
+            },
+            {
+                "name": "4x Luck",
+                "wiki_url": "https://stealabrainrot.fandom.com/wiki/Luck"
+            },
+            {
+                "name": "Pineaplino",
+                "slug": "pineaplino",
+                "image": "/uploads/images/sab/codes/rewards/pineaplino.webp"
+            },
+            {
+                "name": "Lazy Ducky",
+                "slug": "lazy-ducky",
+                "image": "/uploads/images/sab/codes/rewards/lazy-ducky.webp"
+            },
+            {
+                "name": "Globa Steppa",
+                "slug": "globa-steppa",
+                "image": "/uploads/images/sab/codes/rewards/globa-steppa.webp"
+            },
+            {
+                "name": "Rico Dinero",
+                "slug": "rico-dinero",
+                "image": "/uploads/images/sab/codes/rewards/rico-dinero.webp"
+            },
+            {
+                "name": "Pancake and Syrup",
+                "slug": "pancake-and-syrup",
+                "image": "/uploads/images/sab/codes/rewards/pancake-and-syrup.webp"
+            },
+            {
+                "name": "Arcadragon",
+                "slug": "arcadragon",
+                "image": "/uploads/images/sab/codes/rewards/arcadragon.webp"
+            }
+        ]
+    },
+    "expired": [
+        {
+            "code": "SUMMERUPD3",
+            "reward": "Rocketini Frostini (75%) or Frullato Framingo (25%)"
+        },
+        {
+            "code": "OCTOBLOCK555",
+            "reward": "Octo Lucky Block"
+        },
+        {
+            "code": "FREEOCTOBLOCK777",
+            "reward": "Octo Lucky Block"
+        },
+        {
+            "code": "WSUMMERUPD1",
+            "reward": "Premium Octo Lucky Block"
+        },
+        {
+            "code": "ILOVEFOOD123",
+            "reward": "Kraken"
+        },
+        {
+            "code": "FREEOCTOBASE333W",
+            "reward": "Octo Base skin"
+        },
+        {
+            "code": "NEEDTHIS4CRAFT333",
+            "reward": "Chicleteira Surfeiteira"
+        },
+        {
+            "code": "FREEPREMIUMOCTO777",
+            "reward": "Premium Octo Lucky Block"
+        },
+        {
+            "code": "CODESAREREAL321",
+            "reward": "John Pork"
+        },
+        {
+            "code": "FREEOCTO555",
+            "reward": "Octo Lucky Block"
+        },
+        {
+            "code": "WAVERIDER4FREELOL",
+            "reward": "Waverider Gear"
+        },
+        {
+            "code": "CANDY24SAMMY",
+            "reward": "Strawberry Elephant (1)"
+        },
+        {
+            "code": "MAYMEOWLJANDEL",
+            "reward": "Meowl (3)"
+        },
+        {
+            "code": "FREE500DRAGS",
+            "reward": "Dragon Cannelloni"
+        },
+        {
+            "code": "JOHNPORKDAPIGGY",
+            "reward": "John Pork"
+        },
+        {
+            "code": "IMANEGG",
+            "reward": "Strawberry Elephant"
+        },
+        {
+            "code": "PIZZAISYUM",
+            "reward": "Pizza and Ranch"
+        },
+        {
+            "code": "DIVINECURSED",
+            "reward": "Strawberry Elephant"
+        },
+        {
+            "code": "L2EXPLOITERS",
+            "reward": "John Pork"
+        }
+    ]
+}
