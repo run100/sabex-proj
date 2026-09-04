@@ -735,14 +735,14 @@
 
   @if(($locale ?? 'en') === 'en')
   @php
-    $august19NewsHref = rtrim((string) ($urlPrefix ?? ''), '/') . '/news/steal-a-brainrot-sab-values-market-watch-headless-horseman-rebounds-dragon-cannelloni-drops-august-19-2026';
+    $adminAbuseHref = rtrim((string) ($urlPrefix ?? ''), '/') . '/' . \App\Services\Seo\SabWikiPageDefinitions::PAGE_WIKI_ADMIN_ABUSE;
   @endphp
   <div class="sab-news-home-notice mt-3 mb-1 inline-flex max-w-full items-center gap-2 text-left text-xs font-semibold leading-5 text-cyan-200" data-sab-news-home-notice>
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="h-4 w-4 shrink-0 text-cyan-300">
       <path stroke-linecap="round" stroke-linejoin="round" d="M4 14h3l7 4V6L7 10H4v4Z"/>
       <path stroke-linecap="round" stroke-linejoin="round" d="M17 9a3 3 0 0 1 0 6M20 7a6 6 0 0 1 0 10"/>
     </svg>
-    <a href="{{ $august19NewsHref }}" class="font-semibold underline hover:text-cyan-100" data-sab-news-home-notice-link>News · Aug 19 — SAB Values: Headless Horseman rebounds, Dragon Cannelloni drops</a>
+    <a href="{{ $adminAbuseHref }}" class="font-semibold underline hover:text-cyan-100" data-sab-news-home-notice-link>New · Steal a Brainrot Admin Abuse Time Today</a>
   </div>
   <script>
     (function () {
@@ -750,7 +750,7 @@
       if (link) {
         link.addEventListener('click', function () {
           if (typeof gtag === 'function') {
-            gtag('event', 'news_notice_click', { news_slug: 'steal-a-brainrot-sab-values-market-watch-headless-horseman-rebounds-dragon-cannelloni-drops-august-19-2026' });
+            gtag('event', 'wiki_notice_click', { wiki_slug: 'admin-abuse' });
           }
         });
       }
@@ -1032,6 +1032,19 @@
   </div>
 
   <p id="brainrot-table-updated" class="text-xs text-slate-500 mt-3">{{ $t['table_updated'] }}</p>
+  @php
+    $wikiShortcutPrefix = rtrim((string) (
+      $productUrlPrefix
+        ?? (str_starts_with((string) ($urlPrefix ?? ''), '/seo/sab/preview') ? '/seo/sab/preview' : '')
+    ), '/');
+  @endphp
+  @include('seo.sab.partials._wiki-shortcut-module', [
+    'variant' => 'home',
+    'lead' => 'Exist counts can move after an Admin Abuse window or a Rebirth. Open the Wiki for the current schedule and the full Rebirth requirements.',
+    'wikiHubHref' => $wikiShortcutPrefix.'/'.\App\Services\Seo\SabRenderService::PAGE_WIKI,
+    'adminAbuseHref' => $wikiShortcutPrefix.'/'.\App\Services\Seo\SabWikiPageDefinitions::PAGE_WIKI_ADMIN_ABUSE,
+    'rebirthsHref' => $wikiShortcutPrefix.'/'.\App\Services\Seo\SabWikiPageDefinitions::PAGE_WIKI_REBIRTHS,
+  ])
 </section>
 
 <section id="overview" class="mb-8">

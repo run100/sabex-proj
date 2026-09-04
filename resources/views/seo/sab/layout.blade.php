@@ -5,6 +5,7 @@
 </head>
 <body class="bg-slate-950 text-slate-100">
 @include('seo.sab.partials._header')
+@include('seo.sab.partials._wiki-drawer')
 <main class="max-w-7xl mx-auto px-3 pt-4 pb-8 sm:px-4">
   @yield('content')
 </main>

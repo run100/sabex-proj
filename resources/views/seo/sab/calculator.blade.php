@@ -236,6 +236,10 @@
   $existCountListHref = $urlPrefix . '/' . \App\Services\Seo\SabRenderService::PAGE_EXIST_COUNTS_LIST;
   $valueListHref = ($productUrlPrefix ?? '') . '/' . \App\Services\Seo\SabRenderService::PAGE_VALUE_LIST;
   $august19NewsHref = rtrim((string) ($urlPrefix ?? ''), '/') . '/news/steal-a-brainrot-sab-values-market-watch-headless-horseman-rebounds-dragon-cannelloni-drops-august-19-2026';
+  $wikiShortcutPrefix = rtrim((string) ($productUrlPrefix ?? $urlPrefix ?? ''), '/');
+  $adminAbuseHref = $wikiShortcutPrefix . '/' . \App\Services\Seo\SabWikiPageDefinitions::PAGE_WIKI_ADMIN_ABUSE;
+  $wikiHubHref = $wikiShortcutPrefix . '/' . \App\Services\Seo\SabRenderService::PAGE_WIKI;
+  $rebirthsHref = $wikiShortcutPrefix . '/' . \App\Services\Seo\SabWikiPageDefinitions::PAGE_WIKI_REBIRTHS;
   $calculatorFaqItems = $calculatorFaqItems ?? [];
   $popularTradeItems = $popularTradeItems ?? collect();
   $showValuesTip = empty($calculatorOnly);
@@ -517,6 +521,13 @@
   <p class="sab-calc-today__empty">{{ $t['calculator_today_no_movers'] ?? 'No movers today yet.' }}</p>
   @endif
 </section>
+@include('seo.sab.partials._wiki-shortcut-module', [
+  'variant' => 'calculator',
+  'lead' => 'Values do not show event timing or Rebirth unlocks. Check the Wiki if a name in the trade depends on an Admin Abuse window or a Rebirth requirement.',
+  'wikiHubHref' => $wikiHubHref,
+  'adminAbuseHref' => $adminAbuseHref,
+  'rebirthsHref' => $rebirthsHref,
+])
 @endif
 
 <section class="sab-calc-content sab-calc-copy">

@@ -55,6 +55,8 @@ class SabRenderService
 
     public const PAGE_CODES = 'steal-a-brainrot-codes';
 
+    public const PAGE_WIKI = 'wiki';
+
     /** @var list<array{slug: string, title: string, desc: string}> */
     public const NEWS_POPULAR_GUIDES = [
         [
@@ -1576,6 +1578,983 @@ class SabRenderService
         $urlPrefix = self::publicUrlPrefix($locale);
 
         return $this->valueChangesViewPayload($urlPrefix, $locale, $baseUrl, $t, $days, $direction, $sort, self::CSS_HREF_LARAVEL);
+    }
+
+    public function wikiViewContext(): array
+    {
+        return $this->wikiPreviewPayload('wiki');
+    }
+
+    public function wikiCatalogViewContext(string $pageSlug): array
+    {
+        $pageSlug = preg_replace('/\.html$/', '', $pageSlug) ?: '';
+        abort_unless(in_array($pageSlug, SabWikiPageDefinitions::catalogPageSlugs(), true), 404);
+
+        return $this->wikiPreviewPayload($pageSlug);
+    }
+
+    public function wikiTopicViewContext(string $pageSlug): array
+    {
+        $pageSlug = preg_replace('/\.html$/', '', $pageSlug) ?: '';
+        abort_unless(in_array($pageSlug, SabWikiPageDefinitions::topicPageSlugs(), true), 404);
+
+        return $this->wikiPreviewPayload($pageSlug);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function wikiPreviewPayload(string $pageSlug): array
+    {
+        $site = SeoSite::where('slug', self::SITE_SLUG)->firstOrFail();
+        $game = SeoGame::where('seo_site_id', $site->id)
+            ->where('slug', self::GAME_SLUG)
+            ->firstOrFail();
+
+        $baseUrl = rtrim($site->base_url ?: 'https://sabexistcount.com', '/');
+        $i18n = $this->loadI18n($site);
+
+        return $this->wikiPagePayload(
+            $pageSlug,
+            self::publicUrlPrefix(),
+            $baseUrl,
+            $this->mergeSabTranslations(self::DEFAULT_LOCALE, $i18n),
+            $this->loadItems($game),
+            self::CSS_HREF_LARAVEL,
+            $this->loadPublishedNews($site),
+            $game,
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function wikiPagePayload(
+        string $pageSlug,
+        string $urlPrefix,
+        string $baseUrl,
+        array $t,
+        Collection $items,
+        string $cssHref,
+        ?Collection $news = null,
+        ?SeoGame $game = null,
+    ): array {
+        $catalog = $this->buildWikiCatalog($urlPrefix, $items, $news);
+        $pageSlug = $pageSlug === '' ? self::PAGE_WIKI : $pageSlug;
+        $rarityKey = SabWikiPageDefinitions::rarityKeyForPage($pageSlug);
+        $topicKey = SabWikiPageDefinitions::topicKeyForPage($pageSlug);
+        $isHub = $pageSlug === self::PAGE_WIKI;
+        $isCatalog = in_array($pageSlug, SabWikiPageDefinitions::catalogPageSlugs(), true);
+        $isAdminAbuse = $pageSlug === SabWikiPageDefinitions::PAGE_WIKI_ADMIN_ABUSE;
+        $pageRows = collect($catalog['rows']);
+        if ($rarityKey !== null) {
+            $pageRows = $pageRows->where('rarityKey', $rarityKey)->values();
+        } elseif ($topicKey !== null) {
+            $pageRows = $pageRows
+                ->filter(fn (array $row): bool => in_array($topicKey, $row['topicKeys'] ?? [], true))
+                ->values();
+        }
+
+        $pageGroups = $this->wikiGroupsForRows($pageRows, $rarityKey);
+        $copyCount = $isHub ? $catalog['total'] : $pageRows->count();
+        $copy = SabWikiPageDefinitions::copy(
+            $pageSlug,
+            $copyCount,
+            $catalog['knownRarest']['name'] ?? null,
+            $catalog['knownRarest']['existCountLabel'] ?? null,
+        );
+        $isRebirthGuide = $pageSlug === SabWikiPageDefinitions::PAGE_WIKI_REBIRTHS;
+        $adminAbuse = $isAdminAbuse && $game
+            ? app(SabWikiAdminAbuseScheduleService::class)->pageData($game)
+            : null;
+        if ($adminAbuse !== null) {
+            $adminAbuse['related_items_count'] = $pageRows->count();
+        }
+        $rebirths = $isRebirthGuide ? $this->rebirthsData() : null;
+        $rebirthsVerifiedAt = $isRebirthGuide
+            ? Carbon::createFromFormat('!Y-m-d', (string) $rebirths['verified_at'])->startOfDay()
+            : null;
+        if ($isRebirthGuide && $rebirthsVerifiedAt) {
+            $monthLabel = $rebirthsVerifiedAt->locale('en')->isoFormat('MMM YYYY');
+            $copy['title'] = str_replace('{month}', $monthLabel, $copy['title']);
+            $copy['description'] = str_replace('{month}', $monthLabel, $copy['description']);
+        }
+        $t['meta_keywords'] = '';
+        $wikiHref = $this->wikiPageHref($urlPrefix, self::PAGE_WIKI);
+        $allBrainrotsHref = $this->wikiPageHref($urlPrefix, SabWikiPageDefinitions::PAGE_ALL_BRAINROTS);
+        $rebirthsHref = $this->wikiPageHref($urlPrefix, SabWikiPageDefinitions::PAGE_WIKI_REBIRTHS);
+        $existCountHref = rtrim($urlPrefix, '/').'/'.self::PAGE_EXIST_COUNTS_LIST;
+        $valueListHref = rtrim($this->productUrlPrefix($urlPrefix), '/').'/'.self::PAGE_VALUE_LIST;
+        $calculatorHref = rtrim($urlPrefix, '/').'/'.self::PAGE_TRADING_CALCULATOR;
+        $faqItems = $isAdminAbuse
+            ? $this->adminAbuseFaqItems($adminAbuse ?? [], $valueListHref, $calculatorHref, $existCountHref)
+            : ($isHub
+                ? $this->wikiFaqItemsWithInternalLinks($copy['faqs'], $valueListHref, $calculatorHref, $existCountHref)
+                : $copy['faqs']);
+        $canonical = rtrim($baseUrl, '/').'/'.$pageSlug;
+        $isPreview = str_starts_with($urlPrefix, '/seo/sab/preview');
+        $crumbs = $this->wikiCrumbs($urlPrefix, $pageSlug, $copy['h1']);
+        $jsonRows = $isHub
+            ? array_map(fn (array $link): array => [
+                'name' => $link['name'],
+                'slug' => $link['slug'],
+            ], $this->wikiHubListItems($urlPrefix, $catalog))
+            : ($isRebirthGuide
+                ? array_map(fn (array $level): array => [
+                    'name' => 'Rebirth '.$level['level'],
+                    'slug' => 'rebirth-'.$level['level'],
+                    'url' => $canonical.'#rebirth-'.$level['level'],
+                ], $rebirths['levels'] ?? [])
+                : $pageRows->all());
+        $adminCheckedAt = $adminAbuse && ! empty($adminAbuse['source_checked_at'])
+            ? Carbon::parse((string) $adminAbuse['source_checked_at'])
+            : null;
+        $wikiUpdatedAt = $isRebirthGuide
+            ? $rebirthsVerifiedAt
+            : ($isAdminAbuse ? ($adminCheckedAt ?: $catalog['updatedAt']) : $catalog['updatedAt']);
+
+        $topics = array_map(function (array $topic) use ($urlPrefix): array {
+            $topic['href'] = $this->wikiPageHref($urlPrefix, $topic['page']);
+
+            return $topic;
+        }, $catalog['topics']);
+        $topicLinks = $isHub
+            ? array_values(array_map(
+                fn (array $topic): array => [
+                    'href' => $this->wikiPageHref($urlPrefix, $topic['page']),
+                    'label' => $topic['label'],
+                ],
+                array_filter($topics, static fn (array $topic): bool => $topic['key'] === 'admin-abuse'),
+            ))
+            : [];
+
+        return [
+            'locale' => self::DEFAULT_LOCALE,
+            'urlPrefix' => $urlPrefix,
+            'productUrlPrefix' => $this->productUrlPrefix($urlPrefix),
+            'baseUrl' => $baseUrl,
+            't' => $t,
+            'seoTitle' => $copy['title'],
+            'seoDescription' => $copy['description'],
+            'canonical' => $canonical,
+            'robots' => $isPreview ? 'noindex,follow' : 'index,follow,max-image-preview:large',
+            'ogImageAlt' => $copy['og_alt'],
+            'hreflangLinks' => [],
+            'cssHref' => $cssHref,
+            'wikiPageSlug' => $pageSlug,
+            'wikiH1' => $copy['h1'],
+            'wikiLead' => $copy['lead'],
+            'wikiCatalogTitle' => $isRebirthGuide
+                ? 'Confirmed rebirth Brainrots'
+                : ($isAdminAbuse
+                    ? 'Related Brainrots and Lucky Blocks'
+                : ($isCatalog
+                    ? ($rarityKey ? $copy['h1'].' by stored data' : 'All Brainrots by rarity')
+                    : $copy['h1'])),
+            'wikiCatalogDesc' => $isRebirthGuide
+                ? 'Items whose stored obtain method mentions rebirth. This is a catalog of confirmed obtain rows, not the 19-level requirement table above.'
+                : ($isAdminAbuse
+                    ? 'Only items whose stored obtain method mentions Admin Abuse, an Admin Event, or Taco Tuesday. Taco Merchant rows stay on their news and product pages unless that obtain field matches.'
+                : ($isCatalog
+                    ? 'Search every server-rendered row. Sorting keeps Unknown values after confirmed values.'
+                    : 'Only items with a stored match for this topic. Missing obtain methods stay off this list.')),
+            'wikiRows' => $catalog['rows'],
+            'wikiGroups' => $pageGroups,
+            'wikiNewest' => $catalog['newest'],
+            'wikiTopics' => $topics,
+            'wikiNews' => $catalog['news'],
+            'wikiTotal' => $catalog['total'],
+            'wikiPageTotal' => $pageRows->count(),
+            'wikiUpdatedAt' => $wikiUpdatedAt?->toIso8601String(),
+            'wikiUpdatedLabel' => $isRebirthGuide
+                ? $wikiUpdatedAt?->locale('en')->isoFormat('MMM D, YYYY')
+                : $wikiUpdatedAt?->copy()->setTimezone('America/Los_Angeles')->locale('en')->isoFormat('MMM D, YYYY h:mm A z'),
+            'wikiUpdatedDate' => $isRebirthGuide
+                ? $wikiUpdatedAt?->locale('en')->isoFormat('MMM D, YYYY')
+                : $wikiUpdatedAt?->copy()->setTimezone('America/Los_Angeles')->locale('en')->isoFormat('MMM D, YYYY'),
+            'wikiMeta' => $isRebirthGuide
+                ? number_format((int) ($rebirths['max_level'] ?? 0)).' Rebirth levels · Updated '.($wikiUpdatedAt?->locale('en')->isoFormat('MMM D, YYYY') ?: 'Unknown')
+                : ($isAdminAbuse
+                    ? (($adminAbuse['status_label'] ?? 'Not Confirmed').' · Source checked '.($adminAbuse['source_checked_label'] ?? 'Unknown'))
+                    : number_format($pageRows->count()).' confirmed items · Updated '.($wikiUpdatedAt?->copy()->setTimezone('America/Los_Angeles')->locale('en')->isoFormat('MMM D, YYYY') ?: 'Unknown')),
+            'rebirthsGuide' => $isRebirthGuide,
+            'rebirths' => $rebirths,
+            'rebirth19NewsHref' => $isRebirthGuide
+                ? rtrim($urlPrefix, '/').'/news/'.($rebirths['rebirth_19_news_slug'] ?? '')
+                : null,
+            'newsIndexHref' => rtrim($urlPrefix, '/').'/news',
+            'tacoTuesdayNewsHref' => $isAdminAbuse
+                ? rtrim($urlPrefix, '/').'/news/steal-a-brainrot-august-18-2026-taco-tuesday-taco-merchant-sammyni-truckini'
+                : null,
+            'saturdayUpdateNews' => $isAdminAbuse
+                ? $this->adminAbuseSaturdayUpdateNews($news, $urlPrefix)
+                : [],
+            'tacoMerchantItems' => $isAdminAbuse
+                ? $this->adminAbuseTacoMerchantItems($urlPrefix)
+                : [],
+            'wikiFaqItems' => $faqItems,
+            'adminAbuse' => $adminAbuse,
+            'wikiHref' => $wikiHref,
+            'allBrainrotsHref' => $allBrainrotsHref,
+            'rebirthsHref' => $rebirthsHref,
+            'wikiCrumbs' => $crumbs,
+            'wikiRarityLinks' => $this->wikiRarityLinks($urlPrefix, $catalog['groups']),
+            'wikiTopicLinks' => $topicLinks,
+            'existCountHref' => $existCountHref,
+            'valueListHref' => $valueListHref,
+            'calculatorHref' => $calculatorHref,
+            'websiteJsonLd' => $this->websiteJsonLd($baseUrl, $copy['description']),
+            'jsonLd' => $this->wikiPageJsonLd(
+                $copy['title'],
+                $copy['description'],
+                $canonical,
+                $jsonRows,
+                $faqItems,
+                $wikiUpdatedAt,
+                $crumbs,
+                $isHub ? 'SAB Wiki pages' : $copy['h1'],
+                $isHub,
+                $isRebirthGuide ? [
+                    'headline' => $copy['h1'],
+                    'description' => $copy['description'],
+                    'dateModified' => $wikiUpdatedAt?->toDateString(),
+                    'keywords' => 'steal a brainrot rebirth list, steal a brainrot rebirth requirements, steal a brainrot rebirth rewards, steal a brainrot max rebirth, rebirth 19',
+                ] : null,
+                $isAdminAbuse ? $this->adminAbuseEventSchemas($adminAbuse ?? [], $canonical) : [],
+                $isAdminAbuse ? 'WebPage' : null,
+            ),
+        ];
+    }
+
+    /**
+     * Admin Abuse FAQ uses the same visible answer and JSON-LD answer. Links
+     * are added only to the rendered answer_html copy.
+     *
+     * @param  array<string, mixed>  $schedule
+     * @return list<array{question: string, answer: string, answer_html: string}>
+     */
+    private function adminAbuseFaqItems(array $schedule, string $valueListHref, string $calculatorHref, string $existCountHref): array
+    {
+        $admin = is_array($schedule['admin_abuse'] ?? null) ? $schedule['admin_abuse'] : [];
+        $taco = is_array($schedule['taco_tuesday'] ?? null) ? $schedule['taco_tuesday'] : [];
+        $adminTime = (string) ($admin['eastern_time'] ?? 'Not confirmed');
+        $tacoTime = (string) ($taco['eastern_time'] ?? 'Not confirmed');
+        $adminDuration = (string) ($admin['duration_label'] ?? 'Not confirmed');
+        $mechanics = $schedule['mechanics'] ?? [];
+        $mechanicsText = $mechanics === [] ? 'No mechanics are confirmed in the stored source.' : implode(', ', $mechanics).'.';
+        $related = (int) ($schedule['related_items_count'] ?? 0);
+        $adminStatus = (string) ($admin['status'] ?? '');
+        $todayAnswer = match ($adminStatus) {
+            'live' => 'Admin Abuse is Live Now on the status card. The stored start is '.$adminTime.'.',
+            'today' => 'Yes. The stored Admin Abuse window is today, '.$adminTime.'.',
+            default => $adminTime === 'Not confirmed'
+                ? 'Not confirmed. The page does not guess a date when the stored schedule is missing.'
+                : 'Not today. The next stored Admin Abuse is '.$adminTime.'. Taco Tuesday is listed separately.',
+        };
+        $faqs = [
+            ['question' => 'What time is Admin Abuse in Steal a Brainrot today?', 'answer' => 'The next stored Admin Abuse time is '.$adminTime.'. Check the SAB Exist Count status card for Today, Live Now, Upcoming, or Not Confirmed.'],
+            ['question' => 'Is there Admin Abuse in Steal a Brainrot today?', 'answer' => $todayAnswer],
+            ['question' => 'When is the next Steal a Brainrot Admin Abuse?', 'answer' => 'The next stored Admin Abuse occurrence is '.$adminTime.'. Past dates are rejected; the schedule is recalculated from its recurring weekday when possible. Use the SAB Calculator when you prepare a trade around a limited event.'],
+            ['question' => 'What time is Taco Tuesday in Steal a Brainrot?', 'answer' => 'The next stored Taco Tuesday time is '.$tacoTime.'. Eastern Time is shown first and the page adds your local browser time.'],
+            ['question' => 'Is Taco Tuesday an Admin Abuse event?', 'answer' => 'Taco Tuesday is a separate recurring event. It is listed beside Admin Abuse so both search intents resolve without treating them as one event.'],
+            ['question' => 'How do I convert Admin Abuse time to my timezone?', 'answer' => 'Eastern Time is the source display. The timezone table converts the next stored occurrence into Hawaii, Pacific, Mountain, Central, UTC, London, Paris, Dubai, India, Singapore, Japan, and Sydney. The browser also adds your local time on the status card. Daylight saving time is applied automatically.'],
+            ['question' => 'How long does Admin Abuse last?', 'answer' => 'The latest stored Admin Abuse duration is '.$adminDuration.'. Missing duration data stays Not confirmed.'],
+            ['question' => 'What happens during Admin Abuse?', 'answer' => $mechanicsText.' Unconfirmed community claims are omitted.'],
+            ['question' => 'Can you get banned for joining Admin Abuse?', 'answer' => 'No. Admin Abuse is a developer-hosted window, not a glitch or exploit. Joining the event is not a ban reason. This site is still an independent reference and not an official Roblox page.'],
+            ['question' => 'What if I join Admin Abuse late?', 'answer' => 'You can still join after the stored start time. The window is only '.$adminDuration.', so a late join leaves less time to contest spawns. The page does not invent extra minutes.'],
+            ['question' => 'Does Admin Abuse run on a private server?', 'answer' => 'The stored window applies to servers that are already open, including a private server. Some players use a private server to reduce steal contests. It is a community preference, not a requirement.'],
+            ['question' => 'Which Brainrots and Lucky Blocks can appear?', 'answer' => $related > 0 ? $related.' related '.($related === 1 ? 'Brainrot is' : 'Brainrots are').' linked below from confirmed obtain methods. Open a product, then compare its Exist Count and SAB Values before trading.' : 'No related Brainrots or Lucky Blocks have a confirmed Admin Abuse obtain method in the current database.'],
+            ['question' => 'What should I check after Admin Abuse ends?', 'answer' => 'Open the product page for any new copy, then compare SAB Exist Count and SAB Values before you trade. Use the SAB Calculator if you are offering a limited drop. Supply and trade value can move after a busy window.'],
+            ['question' => 'Can the Admin Abuse or Taco Tuesday schedule change?', 'answer' => 'Yes. Events can be delayed, canceled, or moved. The page shows the source checked time and keeps the last successful schedule when a refresh fails.'],
+        ];
+        $links = [
+            'SAB Values' => $valueListHref,
+            'SAB Calculator' => $calculatorHref,
+            'SAB Exist Count' => $existCountHref,
+        ];
+
+        return array_map(function (array $faq) use ($links): array {
+            $html = e($faq['answer']);
+            foreach ($links as $label => $href) {
+                $html = str_replace(e($label), '<a href="'.e($href).'">'.e($label).'</a>', $html);
+            }
+            $faq['answer_html'] = $html;
+
+            return $faq;
+        }, $faqs);
+    }
+
+    /**
+     * Saturday weekly update notes already published on this site. Guides,
+     * comparisons, and Tuesday logs stay out of this list.
+     *
+     * @param  Collection<int, SeoNewsArticle>|null  $news
+     * @return list<array{title: string, href: string, dateLabel: ?string}>
+     */
+    private function adminAbuseSaturdayUpdateNews(?Collection $news, string $urlPrefix): array
+    {
+        return collect($news ?? [])
+            ->filter(fn ($article): bool => $article instanceof SeoNewsArticle
+                && $article->locale === self::DEFAULT_LOCALE
+                && $article->status === 'published'
+                && (int) $article->type === SeoNewsArticle::TYPE_NEWS
+                && $this->isSaturdayWeeklyUpdateNote($article))
+            ->sortByDesc(fn (SeoNewsArticle $article): int => optional($article->published_at)->getTimestamp() ?? 0)
+            ->take(5)
+            ->map(fn (SeoNewsArticle $article): array => [
+                'title' => (string) $article->title,
+                'href' => rtrim($urlPrefix, '/').'/news/'.$article->slug,
+                'dateLabel' => $article->published_at
+                    ? $article->published_at->copy()->setTimezone('America/Los_Angeles')->locale('en')->isoFormat('MMM D, YYYY')
+                    : null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function isSaturdayWeeklyUpdateNote(SeoNewsArticle $article): bool
+    {
+        if ($article->published_at === null) {
+            return false;
+        }
+        if ($article->published_at->copy()->setTimezone(SabWikiAdminAbuseScheduleService::TIMEZONE)->format('l') !== 'Saturday') {
+            return false;
+        }
+        $haystack = mb_strtolower(trim($article->slug.' '.$article->title));
+
+        return preg_match('/calculator|comparison|how-to|trade-watch|brand-guide|\bvs\b|vote/', $haystack) !== 1;
+    }
+
+    /**
+     * Dated Taco Merchant examples from the August 18 Taco Tuesday note.
+     * These are news/product links, not a weekly drop table.
+     *
+     * @return list<array{name: string, href: string}>
+     */
+    private function adminAbuseTacoMerchantItems(string $urlPrefix): array
+    {
+        $prefix = rtrim($this->productUrlPrefix($urlPrefix), '/');
+
+        return [
+            ['name' => 'Sammyni Truckini', 'href' => $prefix.'/products/sammyni-truckini'],
+            ['name' => 'Nachorilla', 'href' => $prefix.'/products/nachorilla'],
+            ['name' => 'Tacoturbo Tacorito', 'href' => $prefix.'/products/tacoturbo-tacorito'],
+            ['name' => 'Burrito Bat', 'href' => $prefix.'/products/burrito-bat'],
+        ];
+    }
+
+    /**
+     * Event schema is deliberately omitted when the collector has no
+     * confirmed future occurrence. The page and FAQ schema remain present.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function adminAbuseEventSchemas(array $schedule, string $canonical): array
+    {
+        if (($schedule['source_status'] ?? 'unconfirmed') !== 'confirmed') {
+            return [];
+        }
+        $events = [];
+        foreach ((array) ($schedule['events'] ?? []) as $event) {
+            if (! is_array($event) || empty($event['next_event_at'])) {
+                continue;
+            }
+            try {
+                $start = Carbon::parse((string) $event['next_event_at']);
+            } catch (\Throwable) {
+                continue;
+            }
+            if ($start->isPast() && ($event['status'] ?? '') !== 'live') {
+                continue;
+            }
+            $end = null;
+            if (! empty($event['duration_max_minutes'])) {
+                $end = $start->copy()->addMinutes((int) $event['duration_max_minutes'])->toIso8601String();
+            }
+            $node = [
+                '@type' => 'Event',
+                '@id' => $canonical.'#'.strtolower(str_replace(' ', '-', (string) $event['label'])),
+                'name' => 'Steal a Brainrot '.$event['label'],
+                'description' => 'Community-confirmed '.$event['label'].' schedule for Steal a Brainrot.',
+                'startDate' => $start->toIso8601String(),
+                'eventStatus' => ($event['event_status'] ?? 'confirmed') === 'postponed'
+                    ? 'https://schema.org/EventPostponed'
+                    : 'https://schema.org/EventScheduled',
+                'eventAttendanceMode' => 'https://schema.org/OnlineEventAttendanceMode',
+                'location' => ['@type' => 'VirtualLocation', 'url' => $canonical],
+                'url' => $canonical,
+            ];
+            if ($end !== null) {
+                $node['endDate'] = $end;
+            }
+            $events[] = $node;
+        }
+
+        return $events;
+    }
+
+    /**
+     * 可见 FAQ 与 JSON-LD 共用同一份文本，仅在页面答案中加入站内链接。
+     *
+     * @param  list<array{question: string, answer: string}>  $faqItems
+     * @return list<array{question: string, answer: string, answer_html: string}>
+     */
+    private function wikiFaqItemsWithInternalLinks(
+        array $faqItems,
+        string $valueListHref,
+        string $calculatorHref,
+        string $existCountHref,
+    ): array {
+        $links = [
+            'SAB Exist Count List' => $existCountHref,
+            'SAB Values list' => $valueListHref,
+            'SAB Calculator' => $calculatorHref,
+            'SAB Exist Count' => $existCountHref,
+            'SAB Values' => $valueListHref,
+        ];
+
+        return array_map(function (array $faq) use ($links): array {
+            $html = e($faq['answer']);
+            $replacements = [];
+            foreach ($links as $label => $href) {
+                $placeholder = '%%SAB_WIKI_LINK_'.count($replacements).'%%';
+                $html = str_replace(e($label), $placeholder, $html);
+                $replacements[$placeholder] = '<a href="'.e($href).'">'.e($label).'</a>';
+            }
+
+            $faq['answer_html'] = strtr($html, $replacements);
+
+            return $faq;
+        }, $faqItems);
+    }
+
+    /**
+     * @return array{rows: list<array<string, mixed>>, groups: list<array<string, mixed>>, topics: list<array<string, mixed>>, newest: list<array<string, mixed>>, news: list<array<string, mixed>>, total: int, updatedAt: ?Carbon, knownRarest: ?array<string, mixed>}
+     */
+    private function buildWikiCatalog(string $urlPrefix, Collection $items, ?Collection $news = null): array
+    {
+        $rarityOrder = SabWikiPageDefinitions::RARITY_ORDER;
+        $changesBySlug = collect(app(SabValueChangesService::class)->changes(7, null, 'recent', 1000))
+            ->keyBy(fn (array $change): string => (string) ($change['itemSlug'] ?? ''));
+        $rows = $items
+            ->filter(fn (SeoItem $item): bool => self::shouldRenderProductHtml($item)
+                && self::shouldIndexProductSlug((string) $item->slug))
+            ->map(function (SeoItem $item) use ($urlPrefix, $rarityOrder, $changesBySlug): array {
+                $rarityKey = self::canonicalRarityKey($item->rarity ?? null);
+                if ($rarityKey === '' || ! in_array($rarityKey, $rarityOrder, true)) {
+                    $rarityKey = 'other';
+                }
+                $rarityLabel = $rarityKey === 'og'
+                    ? 'OG'
+                    : ($rarityKey === 'other' ? 'Other' : self::canonicalRarityLabel($rarityKey));
+                $rot = data_get($item->attributes_json, 'rot_rocks', []);
+                $cost = is_numeric(data_get($rot, 'base_cost')) && (float) data_get($rot, 'base_cost') > 0
+                    ? (float) data_get($rot, 'base_cost')
+                    : null;
+                $income = is_numeric(data_get($rot, 'base_income')) && (float) data_get($rot, 'base_income') > 0
+                    ? (float) data_get($rot, 'base_income')
+                    : null;
+                $tradeValue = self::valueListValueForItem($item);
+                if ($tradeValue !== null && $tradeValue <= 0) {
+                    $tradeValue = null;
+                }
+                $baseVariant = $item->variants->firstWhere('variant_key', 'base')
+                    ?? $item->variants->firstWhere('variant_type', 'base');
+                $baseValue = $baseVariant
+                    ? $baseVariant->currentValues->first(fn ($cv) => ($cv->source?->slug) === SabRotCalculatorSyncService::SOURCE_SLUG)
+                    : null;
+                $demand = trim((string) (data_get($rot, 'demand') ?: $baseValue?->demand ?: ''));
+                $demandLabel = $demand !== '' ? Str::title($demand) : null;
+                $trend = trim((string) data_get($rot, 'trend'));
+                $trendLabel = $trend !== '' ? Str::title(strtolower(str_replace('_', ' ', $trend))) : null;
+                $change = $changesBySlug->get((string) $item->slug);
+                $previousValue = is_numeric($change['beforeValue'] ?? null) ? (float) $change['beforeValue'] : null;
+                $delta = ($previousValue !== null && $tradeValue !== null)
+                    ? round($tradeValue - $previousValue, 4)
+                    : null;
+                $deltaPct = ($previousValue !== null && $previousValue != 0.0 && $delta !== null)
+                    ? round(($delta / $previousValue) * 100, 1)
+                    : null;
+                $changeDirection = 'stable';
+                if ($delta !== null && $delta > 0) {
+                    $changeDirection = 'up';
+                } elseif ($delta !== null && $delta < 0) {
+                    $changeDirection = 'down';
+                }
+                $deltaPctLabel = $deltaPct === null ? null : (($deltaPct > 0 ? '+' : '').$deltaPct.'%');
+                $existDisplay = self::resolveExistCountDisplay($item);
+                $updatedAt = $this->wikiItemUpdatedAt($item);
+                $obtainMethod = self::wikiConfirmedObtainMethod($item);
+                $addedAt = self::homeNewReferenceDate($item);
+                $topicKeys = self::wikiTopicKeys((string) $item->slug, $obtainMethod);
+
+                return [
+                    'name' => (string) $item->name,
+                    'slug' => self::productPublicSlug((string) $item->slug),
+                    'productUrl' => rtrim($this->productUrlPrefix($urlPrefix), '/').'/products/'.self::productPublicSlug((string) $item->slug),
+                    'imageSrc' => $this->wikiLocalImageSrc($item),
+                    'rarityKey' => $rarityKey,
+                    'rarityLabel' => $rarityLabel,
+                    'cost' => $cost,
+                    'costLabel' => self::formatWikiGameMoney($cost),
+                    'income' => $income,
+                    'incomeLabel' => self::formatWikiGameMoney($income, true),
+                    'existCount' => $existDisplay['sort_value'],
+                    'existCountLabel' => match ($existDisplay['kind'] ?? 'none') {
+                        'none' => '-',
+                        'estimated' => $item->exist_estimate_low !== null
+                            ? number_format((int) $item->exist_estimate_low)
+                            : '-',
+                        default => $existDisplay['primary'],
+                    },
+                    'existCountKind' => (string) ($existDisplay['kind'] ?? 'none'),
+                    'existCountBadge' => ($existDisplay['kind'] ?? 'none') === 'estimated' ? 'Estimate' : null,
+                    'tradeValue' => $tradeValue,
+                    'tradeValueLabel' => $tradeValue === null ? '-' : self::formatWikiCompactRobux($tradeValue),
+                    'demandLabel' => $demandLabel,
+                    'trendLabel' => $trendLabel,
+                    'changeDirection' => $deltaPctLabel === null ? null : $changeDirection,
+                    'deltaPctLabel' => $deltaPctLabel,
+                    'obtainMethod' => $obtainMethod,
+                    'isNew' => self::isNewHomeItem($item),
+                    'addedAt' => $addedAt,
+                    'topicKeys' => $topicKeys,
+                    'updatedAt' => $updatedAt,
+                    'search' => mb_strtolower(implode(' ', array_filter([
+                        $item->name,
+                        $item->rarity,
+                        $rarityKey,
+                        $cost,
+                        $income,
+                        $existDisplay['primary'] ?? null,
+                        $tradeValue,
+                        $demandLabel,
+                        $trendLabel,
+                        $deltaPctLabel,
+                        $obtainMethod,
+                    ], fn ($value): bool => trim((string) $value) !== ''))),
+                ];
+            })
+            ->sortBy(fn (array $row): string => strtolower($row['name']))
+            ->values();
+
+        $groups = $this->wikiGroupsForRows($rows, null);
+        $latest = $rows->pluck('updatedAt')->filter()->sortDesc()->first();
+        $knownRarest = $rows
+            ->filter(fn (array $row): bool => ($row['existCountKind'] ?? '') === 'known' && $row['existCount'] !== null)
+            ->sortBy('existCount')
+            ->first();
+        $updatedAt = $latest instanceof Carbon ? $latest : null;
+        $newest = $rows
+            ->filter(fn (array $row): bool => (bool) ($row['isNew'] ?? false))
+            ->sortByDesc(fn (array $row): int => $row['addedAt'] instanceof Carbon ? $row['addedAt']->timestamp : 0)
+            ->take(12)
+            ->values()
+            ->all();
+        $topics = collect(self::wikiTopicDefinitions())
+            ->map(function (array $topic) use ($rows): array {
+                $topicRows = $rows
+                    ->filter(fn (array $row): bool => in_array($topic['key'], $row['topicKeys'] ?? [], true))
+                    ->values()
+                    ->all();
+
+                return [
+                    ...$topic,
+                    'rows' => $topicRows,
+                    'count' => count($topicRows),
+                ];
+            })
+            ->all();
+        $newsItems = collect($news ?? [])
+            ->filter(fn ($article): bool => $article instanceof SeoNewsArticle
+                && $article->locale === self::DEFAULT_LOCALE
+                && $article->status === 'published')
+            ->take(6)
+            ->map(fn (SeoNewsArticle $article): array => [
+                'title' => (string) $article->title,
+                'href' => rtrim($urlPrefix, '/').'/news/'.$article->slug,
+                'dateLabel' => $article->published_at
+                    ? $article->published_at->copy()->setTimezone('America/Los_Angeles')->locale('en')->isoFormat('MMM D, YYYY')
+                    : null,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'rows' => $rows->all(),
+            'groups' => $groups,
+            'topics' => $topics,
+            'newest' => $newest,
+            'news' => $newsItems,
+            'total' => $rows->count(),
+            'updatedAt' => $updatedAt,
+            'knownRarest' => $knownRarest,
+        ];
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    private function wikiGroupsForRows(Collection $rows, ?string $onlyRarity): array
+    {
+        $order = $onlyRarity !== null
+            ? [$onlyRarity]
+            : [...SabWikiPageDefinitions::RARITY_ORDER, 'other'];
+
+        return collect($order)
+            ->map(function (string $key) use ($rows): array {
+                $groupRows = $rows
+                    ->where('rarityKey', $key)
+                    ->sort(function (array $a, array $b): int {
+                        $av = $a['tradeValue'] ?? null;
+                        $bv = $b['tradeValue'] ?? null;
+                        $aHas = $av !== null;
+                        $bHas = $bv !== null;
+                        if ($aHas !== $bHas) {
+                            return $aHas ? -1 : 1;
+                        }
+                        if ($aHas && $bHas) {
+                            $cmp = ((float) $bv) <=> ((float) $av);
+                            if ($cmp !== 0) {
+                                return $cmp;
+                            }
+                        }
+
+                        return strcasecmp((string) $a['name'], (string) $b['name']);
+                    })
+                    ->values()
+                    ->all();
+
+                return [
+                    'key' => $key,
+                    'slug' => str_replace(' ', '-', $key),
+                    'label' => $key === 'og' ? 'OG' : ($key === 'other' ? 'Other' : self::canonicalRarityLabel($key)),
+                    'description' => SabWikiPageDefinitions::SECTION_COPY[$key] ?? '',
+                    'rows' => $groupRows,
+                    'count' => count($groupRows),
+                ];
+            })
+            ->filter(fn (array $group): bool => $group['count'] > 0)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $groups
+     * @return list<array{href: string, label: string, key: string, count: int}>
+     */
+    private function wikiRarityLinks(string $urlPrefix, array $groups): array
+    {
+        $links = [];
+        foreach (SabWikiPageDefinitions::RARITY_PAGE_SLUGS as $key => $slug) {
+            $group = collect($groups)->firstWhere('key', $key);
+            $count = (int) ($group['count'] ?? 0);
+            $links[] = [
+                'href' => $this->wikiPageHref($urlPrefix, $slug),
+                'label' => ($key === 'og' ? 'OG' : self::canonicalRarityLabel($key)).' ('.number_format($count).')',
+                'key' => $key,
+                'count' => $count,
+            ];
+        }
+
+        return $links;
+    }
+
+    /**
+     * Published wiki catalog counts by the eight standard rarities. Does not
+     * build catalog rows. Home filter counts are a different universe.
+     *
+     * @param  Collection<int, SeoItem>|null  $items
+     * @return array<string, int>
+     */
+    public function wikiPublishedRarityCounts(?Collection $items = null): array
+    {
+        $counts = array_fill_keys(array_keys(SabWikiPageDefinitions::RARITY_PAGE_SLUGS), 0);
+        $rarityOrder = SabWikiPageDefinitions::RARITY_ORDER;
+
+        if ($items === null) {
+            $site = SeoSite::query()->where('slug', self::SITE_SLUG)->first();
+            $game = $site
+                ? SeoGame::query()
+                    ->where('seo_site_id', $site->id)
+                    ->where('slug', self::GAME_SLUG)
+                    ->first()
+                : null;
+            $items = $game
+                ? SeoItem::query()
+                    ->where('seo_game_id', $game->id)
+                    ->get(['id', 'slug', 'rarity', 'is_publish_html'])
+                : collect();
+        }
+
+        foreach ($items as $item) {
+            if (! $item instanceof SeoItem
+                || ! self::shouldRenderProductHtml($item)
+                || ! self::shouldIndexProductSlug((string) $item->slug)) {
+                continue;
+            }
+
+            $key = self::canonicalRarityKey($item->rarity ?? null);
+            if ($key === '' || ! in_array($key, $rarityOrder, true) || ! array_key_exists($key, $counts)) {
+                continue;
+            }
+
+            $counts[$key]++;
+        }
+
+        return $counts;
+    }
+
+    /**
+     * @param  array{groups: list<array<string, mixed>>, topics: list<array<string, mixed>>}  $catalog
+     * @return list<array{name: string, slug: string}>
+     */
+    private function wikiHubListItems(string $urlPrefix, array $catalog): array
+    {
+        $items = [[
+            'name' => 'All Brainrots',
+            'slug' => SabWikiPageDefinitions::PAGE_ALL_BRAINROTS,
+        ]];
+        foreach (SabWikiPageDefinitions::RARITY_PAGE_SLUGS as $key => $slug) {
+            $items[] = [
+                'name' => $key === 'og' ? 'OG' : self::canonicalRarityLabel($key),
+                'slug' => $slug,
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * @return list<array{name: string, href: string, current?: bool}>
+     */
+    private function wikiCrumbs(string $urlPrefix, string $pageSlug, string $currentName): array
+    {
+        $homeHref = $urlPrefix === '' ? '/' : $urlPrefix;
+        $crumbs = [
+            ['name' => 'Home', 'href' => $homeHref],
+            ['name' => 'Wiki', 'href' => $this->wikiPageHref($urlPrefix, self::PAGE_WIKI)],
+        ];
+        if ($pageSlug !== self::PAGE_WIKI) {
+            $crumbName = $pageSlug === SabWikiPageDefinitions::PAGE_ALL_BRAINROTS ? 'All Brainrots' : $currentName;
+            $crumbs[] = ['name' => $crumbName, 'href' => $this->wikiPageHref($urlPrefix, $pageSlug), 'current' => true];
+        } else {
+            $crumbs[1]['current'] = true;
+        }
+
+        return $crumbs;
+    }
+
+    private function wikiPageHref(string $urlPrefix, string $pageSlug): string
+    {
+        return rtrim($this->productUrlPrefix($urlPrefix), '/').'/'.$pageSlug;
+    }
+
+    private function wikiLocalImageSrc(SeoItem $item): ?string
+    {
+        $thumbPath = 'uploads/images/sab/thumbs/'.$item->slug.'-64.webp';
+        if (file_exists(public_path($thumbPath))) {
+            return '/'.$thumbPath;
+        }
+
+        $localPath = ltrim((string) $item->local_image_url, '/');
+        if ($localPath !== '' && file_exists(public_path($localPath))) {
+            return '/'.$localPath;
+        }
+
+        return null;
+    }
+
+    private function wikiItemUpdatedAt(SeoItem $item): ?Carbon
+    {
+        $timestamps = collect([$item->updated_at])
+            ->merge($item->variants->flatMap(fn (SeoItemVariant $variant) => $variant->currentValues)
+                ->flatMap(fn (SeoItemCurrentValue $value) => [$value->changed_at, $value->collected_at]))
+            ->filter()
+            ->map(fn ($value): Carbon => $value instanceof Carbon ? $value->copy() : Carbon::parse($value));
+
+        return $timestamps->sortDesc()->first();
+    }
+
+    private static function formatWikiCompactRobux(float $value): string
+    {
+        $abs = abs($value);
+        if ($abs >= 1_000_000) {
+            return rtrim(rtrim(number_format($value / 1_000_000, 1, '.', ''), '0'), '.').'M';
+        }
+        if ($abs >= 1_000) {
+            return rtrim(rtrim(number_format($value / 1_000, 1, '.', ''), '0'), '.').'k';
+        }
+
+        return number_format($value);
+    }
+
+    private static function formatWikiGameMoney(?float $value, bool $perSecond = false): string
+    {
+        if ($value === null || $value <= 0) {
+            return '-';
+        }
+
+        $suffix = '';
+        $scaled = $value;
+        foreach ([1_000_000_000_000 => 'T', 1_000_000_000 => 'B', 1_000_000 => 'M', 1_000 => 'K'] as $threshold => $label) {
+            if ($value >= $threshold) {
+                $scaled = $value / $threshold;
+                $suffix = $label;
+                break;
+            }
+        }
+
+        $decimals = $suffix === '' || $scaled >= 100 ? 0 : ($scaled >= 10 ? 1 : 2);
+        $formatted = number_format($scaled, $decimals, '.', '');
+        if ($decimals > 0) {
+            $formatted = rtrim(rtrim($formatted, '0'), '.');
+        }
+
+        return '$'.$formatted.$suffix.($perSecond ? '/s' : '');
+    }
+
+    private static function wikiConfirmedObtainMethod(SeoItem $item): ?string
+    {
+        $value = trim((string) data_get($item->attributes_json, 'manual_update.obtain_method', ''));
+        if ($value === '' || preg_match('/^(n\/a|na|none|null|unknown|—|-)$/iu', $value)) {
+            return null;
+        }
+
+        return $value;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function wikiTopicKeys(string $slug, ?string $obtainMethod): array
+    {
+        $haystack = mb_strtolower(trim($slug.' '.($obtainMethod ?? '')));
+        $keys = [];
+
+        if (str_contains($haystack, 'lucky-block') || str_contains($haystack, 'lucky block')) {
+            $keys[] = 'lucky-blocks';
+        }
+        if (preg_match('/\bfusions?\b|\bfuse\b|\bcraft(ing)?\b/', $haystack)) {
+            $keys[] = 'fusions';
+        }
+        if (str_contains($haystack, 'rebirth')) {
+            $keys[] = 'rebirths';
+        }
+        if (str_contains($haystack, 'ritual')) {
+            $keys[] = 'rituals';
+        }
+        // Admin Abuse is intentionally narrow. Merchant, Red Carpet, DLC,
+        // shop, and generic RNG rows are not event evidence by themselves.
+        if (preg_match('/admin\s*[- ]?(?:abuse|event|lucky|block)|taco\s+tuesday|limited\s+admin\s+event/', $haystack)) {
+            $keys[] = 'admin-abuse';
+        }
+
+        return $keys;
+    }
+
+    /**
+     * @return list<array{key: string, id: string, label: string, description: string}>
+     */
+    private static function wikiTopicDefinitions(): array
+    {
+        return [
+            [
+                'key' => 'lucky-blocks',
+                'id' => 'lucky-blocks',
+                'page' => SabWikiPageDefinitions::TOPIC_PAGE_SLUGS['lucky-blocks'],
+                'label' => 'Lucky Blocks',
+                'description' => 'Brainrots stored with a Lucky Block obtain path, plus Lucky Block items themselves.',
+            ],
+            [
+                'key' => 'fusions',
+                'id' => 'fusions',
+                'page' => SabWikiPageDefinitions::TOPIC_PAGE_SLUGS['fusions'],
+                'label' => 'Fusions',
+                'description' => 'Items only appear here when a confirmed fusion, fuse, or crafting obtain method is stored.',
+            ],
+            [
+                'key' => 'rebirths',
+                'id' => 'rebirths',
+                'page' => SabWikiPageDefinitions::TOPIC_PAGE_SLUGS['rebirths'],
+                'label' => 'Rebirths',
+                'description' => 'Rebirth is a progression reset. The Rebirth list covers all 19 cash and Brainrot requirements.',
+            ],
+            [
+                'key' => 'rituals',
+                'id' => 'rituals',
+                'page' => SabWikiPageDefinitions::TOPIC_PAGE_SLUGS['rituals'],
+                'label' => 'Rituals',
+                'description' => 'Ritual routes are shown only when an item has a confirmed ritual obtain method.',
+            ],
+            [
+                'key' => 'admin-abuse',
+                'id' => 'admin-abuse',
+                'page' => SabWikiPageDefinitions::TOPIC_PAGE_SLUGS['admin-abuse'],
+                'label' => 'Admin Abuse',
+                'description' => 'Admin Abuse and other limited obtain routes when those methods are stored.',
+            ],
+        ];
+    }
+
+    public function rebirthsData(): array
+    {
+        $path = resource_path('seo/sab/rebirths.json');
+        if (! File::isFile($path)) {
+            throw new \RuntimeException("SAB rebirths file not found: {$path}");
+        }
+
+        $data = json_decode(File::get($path), true);
+        if (! is_array($data)) {
+            throw new \RuntimeException('SAB rebirths file is not valid JSON.');
+        }
+
+        $verifiedAt = trim((string) ($data['verified_at'] ?? ''));
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $verifiedAt)) {
+            throw new \RuntimeException('SAB rebirths verified_at must use YYYY-MM-DD.');
+        }
+        try {
+            $verifiedDate = Carbon::createFromFormat('!Y-m-d', $verifiedAt);
+        } catch (\Throwable) {
+            $verifiedDate = null;
+        }
+        if (! $verifiedDate || $verifiedDate->format('Y-m-d') !== $verifiedAt) {
+            throw new \RuntimeException('SAB rebirths verified_at is not a valid date.');
+        }
+
+        $maxLevel = (int) ($data['max_level'] ?? 0);
+        $levels = $data['levels'] ?? null;
+        $groups = $data['groups'] ?? null;
+        if ($maxLevel < 1 || ! is_array($levels) || count($levels) !== $maxLevel) {
+            throw new \RuntimeException('SAB rebirths levels must match max_level.');
+        }
+        if (! is_array($groups) || $groups === []) {
+            throw new \RuntimeException('SAB rebirths groups are required.');
+        }
+
+        foreach ($levels as $index => $level) {
+            if (! is_array($level)) {
+                throw new \RuntimeException('SAB rebirths levels must be objects.');
+            }
+            $number = (int) ($level['level'] ?? 0);
+            if ($number !== $index + 1) {
+                throw new \RuntimeException('SAB rebirths levels must be numbered 1 through max_level.');
+            }
+            foreach (['cash', 'brainrots', 'rarity', 'multiplier', 'cash_reward', 'special'] as $field) {
+                if (trim((string) ($level[$field] ?? '')) === '') {
+                    throw new \RuntimeException("SAB rebirths level {$number} is missing {$field}.");
+                }
+            }
+        }
+
+        foreach ($groups as $group) {
+            if (! is_array($group) || trim((string) ($group['image'] ?? '')) === '' || trim((string) ($group['title'] ?? '')) === '') {
+                throw new \RuntimeException('SAB rebirths groups require title and image.');
+            }
+        }
+
+        return $data;
     }
 
     /**
@@ -3286,6 +4265,7 @@ class SabRenderService
             'topRareItems'   => $topRareItems,
             'recentlyChangedItems' => $recentlyChangedItems,
             'stats'          => $stats,
+            'wikiHref'       => rtrim($this->productUrlPrefix($urlPrefix), '/').'/'.self::PAGE_WIKI,
             'rarityTags'     => $this->rarityFilterTags($t),
             'rarityTagCounts' => $this->rarityTagCounts($tableItems),
             'statsMonthYear' => $this->formatStatsMonthYear($locale),
@@ -6746,6 +7726,118 @@ class SabRenderService
 
         return ($display['kind'] ?? '') === 'estimated';
     }
+
+    private function wikiPageJsonLd(
+        string $title,
+        string $description,
+        string $url,
+        array $rows,
+        array $faqItems,
+        ?Carbon $updatedAt,
+        array $crumbs = [],
+        string $itemListName = 'All Steal a Brainrot Brainrots',
+        bool $hubList = false,
+        ?array $article = null,
+        array $eventSchemas = [],
+        ?string $pageSchemaType = null,
+    ): string {
+        $siteBase = preg_replace('#/(wiki(?:/.*)?|all-[a-z0-9-]+)$#', '', $url) ?: $url;
+        $listRows = array_values($rows);
+        $crumbItems = $crumbs === []
+            ? [
+                ['@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => $siteBase.'/'],
+                ['@type' => 'ListItem', 'position' => 2, 'name' => 'Steal a Brainrot Wiki', 'item' => $url],
+            ]
+            : array_map(fn (array $crumb, int $index): array => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $crumb['name'],
+                'item' => $crumb['href'] === '/' ? $siteBase.'/' : (str_starts_with((string) $crumb['href'], 'http')
+                    ? $crumb['href']
+                    : $siteBase.((string) $crumb['href'] === '' ? '/' : $crumb['href'])),
+            ], $crumbs, array_keys($crumbs));
+        $graph = [
+            [
+                '@type' => $pageSchemaType ?: 'CollectionPage',
+                '@id' => $url.'#page',
+                'url' => $url,
+                'name' => $title,
+                'description' => $description,
+                'inLanguage' => 'en',
+                'dateModified' => $updatedAt?->toIso8601String(),
+                'mainEntity' => ['@id' => $url.'#brainrots'],
+            ],
+            [
+                '@type' => 'BreadcrumbList',
+                '@id' => $url.'#breadcrumbs',
+                'itemListElement' => $crumbItems,
+            ],
+            [
+                '@type' => 'ItemList',
+                '@id' => $url.'#brainrots',
+                'name' => $itemListName,
+                'numberOfItems' => count($rows),
+                'itemListElement' => array_map(
+                    fn (array $row, int $index): array => [
+                        '@type' => 'ListItem',
+                        'position' => $index + 1,
+                        'name' => $row['name'],
+                        'url' => $row['url'] ?? ($hubList
+                            ? rtrim($siteBase, '/').'/'.$row['slug']
+                            : rtrim($siteBase, '/').'/products/'.$row['slug']),
+                    ],
+                    $listRows,
+                    array_keys($listRows),
+                ),
+            ],
+        ];
+
+        if ($faqItems !== []) {
+            $graph[] = [
+                '@type' => 'FAQPage',
+                '@id' => $url.'#faq-schema',
+                'mainEntity' => array_map(fn (array $faq): array => [
+                    '@type' => 'Question',
+                    'name' => $faq['question'],
+                    'acceptedAnswer' => [
+                        '@type' => 'Answer',
+                        'text' => $faq['answer'],
+                    ],
+                ], $faqItems),
+            ];
+        }
+
+        if ($article !== null) {
+            $graph[] = [
+                '@type' => 'Article',
+                '@id' => $url.'#article',
+                'headline' => $article['headline'],
+                'description' => $article['description'],
+                'author' => ['@type' => 'Organization', 'name' => 'SABExistCount'],
+                'publisher' => ['@type' => 'Organization', 'name' => 'SABExistCount'],
+                'mainEntityOfPage' => $url,
+                'dateModified' => $article['dateModified'] ?? $updatedAt?->toDateString(),
+                'keywords' => $article['keywords'] ?? '',
+            ];
+        }
+
+        foreach ($eventSchemas as $eventSchema) {
+            if (is_array($eventSchema) && ($eventSchema['@type'] ?? null) === 'Event') {
+                $graph[] = $eventSchema;
+            }
+        }
+
+        $schema = [
+            '@context' => 'https://schema.org',
+            '@graph' => $graph,
+        ];
+
+        return '<script type="application/ld+json">'.json_encode(
+            $schema,
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+        ).'</script>';
+    }
+
 
     private function websiteJsonLd(string $baseUrl, string $description): string
     {

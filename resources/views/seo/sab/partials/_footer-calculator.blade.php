@@ -4,6 +4,9 @@
   $privacyHref = \App\Services\Seo\SabRenderService::calculatorStaticPageHref($urlPrefix ?? '', 'privacy-policy');
   $termsHref = \App\Services\Seo\SabRenderService::calculatorStaticPageHref($urlPrefix ?? '', 'terms-of-service');
   $faqHref = $faqHref ?? \App\Services\Seo\SabRenderService::calculatorStaticPageHref($urlPrefix ?? '', 'faq');
+  $footerWikiPrefix = rtrim((string) ($productUrlPrefix ?? ''), '/');
+  $footerAdminAbuseHref = $footerWikiPrefix.'/'.\App\Services\Seo\SabWikiPageDefinitions::PAGE_WIKI_ADMIN_ABUSE;
+  $footerRebirthsHref = $footerWikiPrefix.'/'.\App\Services\Seo\SabWikiPageDefinitions::PAGE_WIKI_REBIRTHS;
 @endphp
 <footer class="sab-calc-site-footer">
   <div class="sab-calc-site-footer-inner">
@@ -17,6 +20,10 @@
       <a href="{{ $aboutHref }}">{{ $t['footer_about'] ?? 'About Us' }}</a>
       <a href="{{ $privacyHref }}">{{ $t['footer_privacy'] ?? 'Privacy Policy' }}</a>
       <a href="{{ $termsHref }}">{{ $t['footer_terms'] ?? 'Terms of Service' }}</a>
+      @if(empty($calculatorOnly))
+      <a href="{{ $footerAdminAbuseHref }}">Admin Abuse</a>
+      <a href="{{ $footerRebirthsHref }}">Rebirth List</a>
+      @endif
     </div>
   </div>
   <p class="sab-calc-footer-disclaimer">

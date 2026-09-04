@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Seo;
 
 use App\Http\Controllers\Controller;
 use App\Services\Seo\SabRenderService;
+use App\Services\Seo\SabWikiPageDefinitions;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\View\View;
@@ -33,6 +34,23 @@ class SabPublicController extends Controller
     public function valueChanges(SabRenderService $sabRender): View
     {
         return view('seo.sab.value-changes', $sabRender->valueChangesViewContext());
+    }
+
+    public function wiki(SabRenderService $sabRender): View
+    {
+        return view('seo.sab.wiki', $sabRender->wikiViewContext());
+    }
+
+    public function wikiNestedTopic(string $slug, SabRenderService $sabRender): View
+    {
+        $slug = preg_replace('/\.html$/', '', $slug) ?: '';
+        $page = 'wiki/'.$slug;
+        if (in_array($page, SabWikiPageDefinitions::catalogPageSlugs(), true)) {
+            return view('seo.sab.wiki-catalog', $sabRender->wikiCatalogViewContext($page));
+        }
+        abort_unless(in_array($page, SabWikiPageDefinitions::topicPageSlugs(), true), 404);
+
+        return view('seo.sab.wiki-topic', $sabRender->wikiTopicViewContext($page));
     }
 
     public function games(Request $request, SabRenderService $sabRender, ?string $locale = null): View
@@ -95,8 +113,17 @@ class SabPublicController extends Controller
     {
         $payload = $sabRender->homeViewContext();
         $baseUrl = rtrim((string) ($payload['baseUrl'] ?? config('app.url')), '/');
-        $xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
-        $xml .= '  <url><loc>'.htmlspecialchars($baseUrl.'/').'</loc></url>\n</urlset>';
+        $locs = [$baseUrl.'/', $baseUrl.'/wiki'];
+        foreach (SabWikiPageDefinitions::shippingPageSlugs() as $slug) {
+            $locs[] = $baseUrl.'/'.$slug;
+        }
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
+        foreach ($locs as $loc) {
+            $xml .= '  <url><loc>'.htmlspecialchars($loc, ENT_XML1).'</loc></url>'."\n";
+        }
+        $xml .= '</urlset>';
 
         return response($xml, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
     }

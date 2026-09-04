@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Seo\SabPublicController;
 use App\Services\Seo\SabRenderService;
+use App\Services\Seo\SabWikiPageDefinitions;
 use Illuminate\Support\Facades\Route;
 
 $localePattern = implode('|', array_filter(
@@ -17,6 +18,12 @@ Route::get('/sab-exist-count-list', [SabPublicController::class, 'existCountsLis
 Route::get('/exist-count-gallery', [SabPublicController::class, 'existCountGallery']);
 Route::get('/sab-value-list', [SabPublicController::class, 'valueList']);
 Route::get('/value-changes', [SabPublicController::class, 'valueChanges']);
+Route::get('/wiki/{slug}', [SabPublicController::class, 'wikiNestedTopic'])
+    ->where('slug', implode('|', array_map(
+        fn (string $slug): string => $slug.'(?:\\.html)?',
+        SabWikiPageDefinitions::nestedPreviewSlugs()
+    )));
+Route::get('/wiki', [SabPublicController::class, 'wiki']);
 Route::get('/steal-a-brainrot-codes', [SabPublicController::class, 'codes']);
 Route::get('/steal-a-brainrot-trading-calculator', [SabPublicController::class, 'calculator']);
 Route::get('/about-us', [SabPublicController::class, 'staticPage'])->defaults('legalSlug', 'about-us');

@@ -4,14 +4,36 @@
 
 对照源站用 GEOFlow preview：`http://127.0.0.1:8083/seo/sab/preview/`（本机是 `php83 artisan serve --port=8083`，不是 OpenResty）。
 
+## 项目来由
+
+原来 sabexistcount.com 不是单独仓库，而是挂在 GEOFlow 里的一个 SEO 站点：
+
+- 数据在 Postgres `geo_ant_design_pro` 的 `seo_*` 表，和 MM2、GAG2 等站共用同一套库
+- 页面是 Blade + `seo:sab-render`，生成静态 HTML 推到 `~/project-seo/seo-sabexistcount` 再上线
+- 采集、调价、新闻 seeder、preview 都在 GEOFlow 后台和 artisan 命令里
+
+这样有几个问题：和别的站绑在一起、静态生成链路重、本机 preview 还要走 GEOFlow。所以另开 **sabex-proj**：Laravel 13 + PHP 8.3 + 本机 MySQL `sabexistcount`，把 sabexistcount **整站**做成动态 Blade SSR。
+
+第一期边界（当时就钉死的）：
+
+- 只搬现有公开站 URL 和数字，禁止编造 exist / 价格
+- **表不走 Laravel migrate**：按 GEOFlow 现库列对照，人手建 MySQL 表，再导入
+- 第一期不导 GEOFlow 那 24 万行全量 `seo_item_observations`
+- 不做：交易贴、Discord 登录、GAG2、**sabcalculator.com 独立站**、Vercel/Neon、再往 `project-seo` 推整站静态 HTML
+- Wiki（`/wiki`）后来在 GEOFlow 加了，**本站已挂**（无 preview 前缀、无 `/{locale}/wiki`）
+- 后台规划 Vue 3 + Element Plus（`console/`，路径 `/j8xq-4n2m-w9kp`），**还没做**
+
+后来又定了：价格日更只在 sabex 跑，不再写 GEOFlow；价格图改成按商品一个 JSON，不再扫观测全表。GEOFlow 只当对照 preview 和「把最新业务数据导过来」的源。
+
 ## 是什么 / 不是什么
 
 | | 说明 |
 | --- | --- |
-| 是 | sabexistcount 整站：exist count、value list、codes、计算器、新闻、商品页 |
+| 是 | sabexistcount 整站：exist count、value list、codes、计算器、新闻、商品页、Wiki |
 | 不是 | sabcalculator.com 独立站（GEOFlow 的 `/seo/sabcalculator/preview/`） |
 | 不是 | GEOFlow 管理端 SPA |
-| 第一期不做 | 交易贴、Discord 登录、GAG2、Wiki 页、Vercel/Neon |
+| 第一期不做 | 交易贴、Discord 登录、GAG2、Vercel/Neon |
+| Wiki | 已挂 `/wiki` 及 14 个子页（对照 GEOFlow preview，公开链无前缀） |
 
 GEOFlow 里 `http://127.0.0.1:8083/seo/sab/preview/steal-a-brainrot-trading-calculator` 就是 sabexistcount 的计算器页，对应本站 `/steal-a-brainrot-trading-calculator`。
 
@@ -58,7 +80,7 @@ server {
 }
 ```
 
-`fpm83` 已指向 `unix:/tmp/php83.socket`。测通后把 `.env` 的 `APP_URL` 改成 `http://127.0.0.1:7310`（现在还是当初 artisan 的 `18088`）。
+`fpm83` 已指向 `unix:/tmp/php83.socket`。本机实际 vhost 听的是 **7510**（`731-sabex.conf`），7310 没起来时用 `http://127.0.0.1:7510/`。`.env` 的 `APP_URL` 仍是当初 artisan 的 `18088`。
 
 不要占用 `8083`：OpenResty 的 `*:8083` 是旧站 lolga；`127.0.0.1:8083` 是 GEOFlow artisan。
 
@@ -68,7 +90,7 @@ server {
 - 渲染：`app/Services/Seo/SabRenderService.php`（`SITE_SLUG = sab-exist-count`）
 - 站点上下文：`app/Services/Seo/SabSiteContext.php`
 - 日更：`app/Services/Seo/SabRotCalculatorSyncService.php`、`SabPriceHistoryWriter.php`
-- 模板：`resources/views/seo/sab/`（从 GEOFlow 拷来，不含后来的 Wiki blade）
+- 模板：`resources/views/seo/sab/`（含 `wiki*.blade.php` 与 `partials/_wiki-*`）
 - 配置：`config/sab.php`（`CONSOLE_PATH`、`ADMIN_ALLOW_IPS`）
 
 代码里仍有 `local_preview_base_url = http://127.0.0.1:8083`，那是对照 GEOFlow preview 用的，不是本站对外地址。
@@ -86,13 +108,25 @@ server {
 | `/value-changes` | 价值变动 |
 | `/steal-a-brainrot-codes` | codes |
 | `/steal-a-brainrot-trading-calculator` | 计算器 |
+| `/wiki` | Wiki hub |
+| `/wiki/{slug}` | Wiki 子页（白名单 14 个 slug，见下） |
 | `/news`、`/news/{slug}` | 新闻 |
 | `/products/{slug}` | 商品 |
 | `/games`、`/games/{slug}` | games |
 | `/about-us`、`/privacy-policy`、`/terms-of-service` | 法律页 |
 | `/robots.txt`、`/sitemap.xml` | robots / sitemap |
 
-没有 `/wiki`。GEOFlow 后来加的 Wiki（all-brainrots、rarity、rebirth-list、admin-abuse 等）第一期不搬。
+Wiki **已挂** `/wiki`（无 preview 前缀，也无 `/{locale}/wiki`）。对照：`http://127.0.0.1:8083/seo/sab/preview/wiki`。未在白名单的路径（如 `/wiki/events`）保持 404。
+
+| GEOFlow preview | 本站 |
+| --- | --- |
+| `/seo/sab/preview/wiki` | `/wiki` |
+| `/seo/sab/preview/wiki/all-brainrots` | `/wiki/all-brainrots` |
+| `/wiki/all-{common,rare,epic,legendary,mythic}-brainrots`、`/wiki/all-brainrot-god`、`/wiki/all-secret-brainrots`、`/wiki/all-og-brainrots` | 同路径 |
+| `/wiki/steal-a-brainrot-rebirth-list`、`/wiki/admin-abuse` | 同路径（写入 sitemap） |
+| `/wiki/rituals`、`/wiki/all-lucky-blocks`、`/wiki/all-fusions` | 同路径（路由已挂，不进 sitemap） |
+
+`SabRenderService` 只补了 wiki 方法与活 sitemap 的 Wiki loc；商品 30D 仍读本站 `{slug}.json`。`robots.txt` 仍是全站 Allow，不写后台路径。
 
 ## 后台
 
@@ -102,15 +136,116 @@ server {
 
 上线方向：IP 白名单（Cloudflare 认 `CF-Connecting-IP`）+ 登录 + 不收录。不要把后台路径写进 `robots.txt`。sitemap / 前台不链后台；未授权返回 **404**；仅已登录响应当下加 `X-Robots-Tag: noindex`。
 
-## 数据
+## 表怎么来的
 
-表结构对齐 GEOFlow 的 `seo_*`。导入脚本在源仓库：`geo-ant-design-pro/scripts/export-sab-to-mysql.php`。
+sabex 的 Laravel migration **只有** `users` / `cache` / `jobs`，没有 `seo_*`。这些表是按 GEOFlow Postgres `information_schema` 人手在 MySQL 建的，列名对齐，**禁止再 `migrate` / `migrate:fresh` 去建或重建**。
 
-已进过 MySQL 的大致包括：`seo_sites`、`seo_games`、`seo_items`、`seo_item_variants`、`seo_item_current_values`、`seo_news_articles`、`seo_value_sources`、aliases、translations。首次导入时**表里已有行就整表 skip**，所以商品 / 新闻相对 GEOFlow 可能过时。观测表 `seo_item_observations` 不从 Postgres 覆盖，由本站日更自己写。
+类型对照：`bool` → `TINYINT(1)`，`timestamp` → `TIMESTAMP`，`json` → `JSON`，`numeric` → `DECIMAL`，`int8` → `BIGINT`。MySQL `TEXT` 只有 64KB，新闻 `body_html`、商品 `rot_rocks_description_html/text` 必须用 `LONGTEXT`。
 
-观测 `id` **没有 AUTO_INCREMENT**，插入必须手动赋 `max(id)+1`，且不要走 fillable `create(['id' => ...])`，要用 `$model->id = ...; $model->save()`。NOT NULL 字符串列用 `''`，不要 null。
+本库现有 10 张业务表（没有 `seo_sync_runs`，日更也不依赖它）：
 
-商品图：`public/uploads/images/sab` 链到 GEOFlow 同名目录。
+最近一次 upsert 打印（postgres / mysql 相同）：
+
+```
+seo_sites 1
+  └── seo_games 1
+        └── seo_items 582            （listed 579）
+              ├── seo_item_aliases 2
+              ├── seo_item_translations 0
+              └── seo_item_variants 8571
+                    ├── seo_item_current_values 4938   （每个 variant × source 一行最新价）
+                    └── seo_item_observations 12676    （未从 GEOFlow 再导；本站日更自写）
+seo_value_sources 14          （整表拷，含 rot-rocks-calculator）
+seo_news_articles 54          （published 新闻 50 + draft 1 + type=100 静态 3）
+```
+
+站点行：`seo_sites.id=1`，`slug=sab-exist-count`，`base_url=https://sabexistcount.com`。游戏行：`seo_games.id=1`，`slug=steal-a-brainrot`。
+
+### 每张表干什么
+
+| 表 | 作用 | 关键列 / 约束 |
+| --- | --- | --- |
+| `seo_sites` | 站点 | `slug` 唯一。本站只有 `sab-exist-count` |
+| `seo_games` | 游戏 | `(seo_site_id, slug)` 唯一 |
+| `seo_value_sources` | 价格/exist 来源 | `rot-rocks-calculator` 是计算器日更源 |
+| `seo_items` | 商品 | 55 列。常用：`slug`、`name`、`rarity`、`is_listed`、`total_exists`、`local_image_url`、`attributes_json`、趋势字段。listed 579 |
+| `seo_item_variants` | 默认 / mutation / trait | `(seo_item_id, variant_key)` 唯一。`variant_key=base` 是默认形态 |
+| `seo_item_current_values` | 每个 variant+来源的**当前** exist/value | `(seo_item_variant_id, seo_value_source_id)` 唯一 |
+| `seo_item_observations` | 采集快照（只追加） | `id` **没有 AUTO_INCREMENT** |
+| `seo_news_articles` | 新闻 + legal 类静态文 | `type`：100 静态页、200 新闻 |
+| `seo_item_aliases` | 跨来源别名 | 现 2 行 |
+| `seo_item_translations` | 商品译文 | 现 0 行；前台多语言主要靠 `sab-i18n.json` |
+
+插入观测：必须 `$model->id = max(id)+1; $model->save()`，不要 `create(['id' => ...])`（`id` 不在 fillable）。NOT NULL 字符串用 `''`，不要 null。本库 `max(id)` 曾到约 306557（id 从 GEOFlow 近期观测拷过来，不是从 1 连号）。
+
+页面读价：当前价走 `seo_item_current_values`；30 天图**不扫**观测表，读 `storage/app/seo/sab-price-history/{slug}.json`。
+
+## 数据怎么搞的
+
+两套库，脚本只读源、只写目标：
+
+| | 源 GEOFlow | 目标 sabex |
+| --- | --- | --- |
+| 引擎 | Postgres | MySQL |
+| 库 | `geo_ant_design_pro` | `sabexistcount` |
+| 账号 | `coolshell` / 空密码 | `root` / `admin` |
+| 范围 | `seo_sites.slug = sab-exist-count` 及相关行；`seo_value_sources` 整表 | 保留原 `id` |
+
+### 1. 首次导入（已做过）
+
+脚本在源仓库：`geo-ant-design-pro/scripts/export-sab-to-mysql.php`。PDO 直连两边，不用 CSV（新闻 HTML 会被 CSV 弄坏）。
+
+```bash
+cd /Users/coolshell/projects/ai2024/geo-ant-design-pro
+php83 scripts/export-sab-to-mysql.php --dry-run
+php83 scripts/export-sab-to-mysql.php
+```
+
+行为：
+
+- 只处理 `sab-exist-count` 的 site / game / items / variants / current_values / news / aliases / translations，以及全部 `seo_value_sources`
+- 按主键 `INSERT ... ON DUPLICATE KEY UPDATE`（更新非 id 列）。不 DELETE、不 TRUNCATE
+- **永不**导出或覆盖 `seo_item_observations`，也不写 `sab-price-history/`。`--with-observations` / `--recent-observations` 若仍在 argv 里会打印 skip
+- 去掉首次导入的硬校验（563 / 8451 / 4809 / 52），结束时打印 postgres vs mysql 行数后正常退出
+
+库外文件（导入时另拷或 symlink，不在 SQL 里）：
+
+| 本站路径 | 用途 |
+| --- | --- |
+| `public/uploads/images/sab` → GEOFlow 同名目录 | 商品图 symlink，新图补文件、不删旧图 |
+| `resources/seo/sab/codes.json`（及 `codes-i18n*.json`） | codes 页 |
+| `storage/app/seo/sab-i18n.json` | 站点文案翻译 |
+| `storage/app/seo/sab-exist-count-gallery.json` | gallery |
+| `storage/app/seo/sab-calculator-meta.json` | 计算器 meta |
+| `storage/app/seo/sab-price-history/{slug}.json` | 现 561 个文件（新商品可能还没有；商品页读不到也不 500） |
+| `resources/seo/sab/rebirths.json` | Wiki rebirth 指南 |
+
+不要从 MySQL 全表重造价格 JSON（早期观测只有 base，mutation 历史在文件里）。
+
+### 2. 本站日更（已接上，不经过 GEOFlow）
+
+```bash
+cd /Users/coolshell/projects/ai2024/sabex-proj
+php83 artisan seo:sab-calculator-refresh
+```
+
+`bootstrap/app.php` 默认每天 `04:30`。`SAB_CALCULATOR_SYNC_ENABLED` / `SAB_CALCULATOR_SYNC_AT`。
+
+打 rot.rocks，**只更新已经 listed 的商品**：写 `seo_item_current_values`，12h 相同 hash 不重复插观测，按 slug 合并当天点到本站 `{slug}.json`（不删历史点，不写 GEOFlow）。远程有、本库没有的新 slug 会计入 `skipped_remote`，**不会自动建商品**。新商品要等下面第 3 步从 GEOFlow upsert 过来。
+
+### 3. 再把 GEOFlow 最新业务数据同步过来（已按 upsert 做）
+
+export 已是按主键 upsert。需要时再跑同一脚本即可（先 `--dry-run` 看行数）：
+
+- `seo_sites` / `seo_games`（含 `settings_json`）
+- `seo_items` / `seo_item_variants` / `seo_item_current_values`
+- `seo_news_articles` / `seo_value_sources` / aliases / translations
+- **不要**导出或覆盖 `seo_item_observations`
+- **不要**重写 `sab-price-history/`
+- checksum 不同才覆盖 `codes.json`、`sab-i18n.json`、gallery、calculator-meta；`rebirths.json` 已在本站
+- 商品图目录是指向 GEOFlow 同名目录的 symlink，新图自动可见，不删旧图
+
+对照：`http://127.0.0.1:8083/seo/sab/preview/wiki` 与各子页；抽旧商品 + 新商品的 exist/当前价、`/news` 条数、codes；30D 图仍读本站 JSON。本机 7310 若没起来，用实际入口 `http://127.0.0.1:7510/`。
 
 ## 价格曲线
 
@@ -135,19 +270,17 @@ GEOFlow 的 `seo:sab-calculator-refresh`（preview → 有变化才 sync → ren
 
 | | GEOFlow | sabex |
 | --- | --- | --- |
-| 角色 | 源站 / 对照 preview、部分采集仍在那边跑 | 线上 sabexistcount 的独立拷贝 |
-| 库 | Postgres，禁止为调试改它 | MySQL `sabexistcount` |
+| 角色 | 源库、对照 preview、新品/新闻/exist 仍可能先在那边落库 | 线上 sabexistcount 的独立动态站 |
+| 库 | Postgres，**禁止为调试改它** | MySQL `sabexistcount` |
 | Preview | `http://127.0.0.1:8083/seo/sab/preview/` | 本机拟用 `http://127.0.0.1:7310/` |
-| Wiki | 已有 12 个 URL | 没有 |
-| 价格 JSON 日更 | 不再给本站写 | 只在本站跑 |
+| Wiki | `/seo/sab/preview/wiki` 及子页 | 已挂 `/wiki`（公开站 `index,follow`） |
+| 价格日更 | 不再给本站写 | `seo:sab-calculator-refresh` 只写本站 |
 
-待做（只同步数据，不搬 Wiki / 不改 blade）：
+日常数据流：
 
-1. export 改成按主键 `INSERT ... ON DUPLICATE KEY UPDATE`（items / variants / current_values / news / games.settings_json / sources / aliases）。禁止 TRUNCATE / DELETE 观测
-2. 覆盖本站在用的 `codes.json`、`storage/app/seo/sab-i18n.json`、`sab-exist-count-gallery.json`、`sab-calculator-meta.json`
-3. 不拷 Wiki 用的 `rebirths.json`，不重写 `sab-price-history/`
-4. 新商品图补到本站（确认 symlink），不删旧图
-5. 对照 8083 preview：旧商品 + 新商品 exist / 当前价、`/news` 条数、codes；30D 图仍读本站 JSON
+1. GEOFlow 继续采集 / 人工改商品和新闻（Postgres）
+2. 需要时跑 upsert 版 export，把业务表和 codes/i18n/gallery/meta 同步到 sabex（观测和价格 JSON 除外）
+3. sabex 自己每天打 rot.rocks 更新当前价和 `{slug}.json`
 
 ## 硬约束
 

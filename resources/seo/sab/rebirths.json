@@ -1,0 +1,277 @@
+{
+    "verified_at": "2026-09-01",
+    "max_level": 19,
+    "rebirth_19_news_slug": "steal-a-brainrot-august-15-2026-rebirth-19-candini-fluffini-la-fuse-machine",
+    "groups": [
+        {
+            "id": "1-4",
+            "title": "Rebirths 1–4: Learn the Reset Loop",
+            "image": "/uploads/images/sab/rebirths/rebirths-1-4.webp",
+            "alt": "Rebirths 1–4: Early Game Requirements Steal a Brainrot cash requirements, Brainrots, and rewards",
+            "caption": "Rebirths 1–4 — cash, Brainrot, and reward snapshot for the first four resets.",
+            "body": "Cash climbs from $500K to $35M in four resets, about 70x. Rebirth 2 is the first reset that changes the base itself: a second floor and an extra slot. Rebirths 3 and 4 still use Epic and Legendary Brainrots, so the delay is usually cash pacing, not a Secret hunt."
+        },
+        {
+            "id": "5-8",
+            "title": "Rebirths 5–8: Mythic Cash Climb",
+            "image": "/uploads/images/sab/rebirths/rebirths-5-8.webp",
+            "alt": "Rebirths 5–8: Mid-Game Growth Steal a Brainrot cash requirements, Brainrots, and rewards",
+            "caption": "Rebirths 5–8 — Mythic Brainrots and the last stretch before Brainrot God.",
+            "body": "This block runs $100M to $5B, a 50x cash climb, while every listed Brainrot stays Mythic. Rebirth 8 is the last reset before Brainrot God becomes the gate. Secure Te Te Te Sahur before the cash target; the next multiplier is what makes the later billions realistic."
+        },
+        {
+            "id": "9-12",
+            "title": "Rebirths 9–12: Brainrot God and the Third Floor",
+            "image": "/uploads/images/sab/rebirths/rebirths-9-12.webp",
+            "alt": "Rebirths 9–12: Third-Floor Progression Steal a Brainrot cash requirements, Brainrots, and rewards",
+            "caption": "Rebirths 9–12 — Brainrot God requirements and the third-floor unlock at Rebirth 10.",
+            "body": "Cash moves from $12.5B to $3.5T, and every required Brainrot is a Brainrot God. Rebirth 10 unlocks the third floor, which is what lets the x9 multiplier actually use more parked income. Check Girafa Celestre and later Gods on the Exist Count list before you spend a low-supply copy on the reset."
+        },
+        {
+            "id": "13-16",
+            "title": "Rebirths 13–16: First Secret Gate",
+            "image": "/uploads/images/sab/rebirths/rebirths-13-16.webp",
+            "alt": "Rebirths 13–16: The Secret Requirement Starts Steal a Brainrot cash requirements, Brainrots, and rewards",
+            "caption": "Rebirths 13–16 — Brainrot God stretch, then Los Tralaleritos at Rebirth 16.",
+            "body": "Cash goes from $14T to $1Qa, but the real jump is rarity. Rebirths 13–15 stay Brainrot God. Rebirth 16 asks for Los Tralaleritos, the first Secret on this list. Players who treat 16 like another cash grind stall here. Start tracking Secret supply before the $1Qa farm is finished."
+        },
+        {
+            "id": "17-19",
+            "title": "Rebirths 17–19: Current Secret Endgame",
+            "image": "/uploads/images/sab/rebirths/rebirths-17-19.webp",
+            "alt": "Rebirths 17–19: Current Endgame Steal a Brainrot cash requirements, Brainrots, and rewards",
+            "caption": "Rebirths 17–19 — Secret-only requirements through the current max Rebirth.",
+            "body": "The last three levels are Secret-only, with cash at $2Qa, $10Qa, and $30Qa. Rebirth 17 is the only current level that needs two Secrets at once. Rebirth 19 is the current cap: $30Qa plus La Grande Combinasion for x19 income, $250T starting cash, and Grief Shield. Update 64 did not add Rebirth 20."
+        }
+    ],
+    "levels": [
+        {
+            "level": 1,
+            "cash": "$500K",
+            "brainrots": "Trippi Troppi + Gangster Footera",
+            "rarity": "Rare",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x0.5",
+            "cash_reward": "$5K",
+            "base_reward": null,
+            "special": "Friend Controller, Iron Slap, Gravity Coil, Bee Launcher"
+        },
+        {
+            "level": 2,
+            "cash": "$1.5M",
+            "brainrots": "Brr Brr Patapim + Boneca Ambalabu",
+            "rarity": "Rare + Epic",
+            "tag": "2nd Floor",
+            "tag_kind": "floor",
+            "multiplier": "x1",
+            "cash_reward": "$10K",
+            "base_reward": "+1 & 2nd Floor",
+            "special": "Gold Slap, Coil Combo, Rage Table"
+        },
+        {
+            "level": 3,
+            "cash": "$12.5M",
+            "brainrots": "Trulimero Trulicina + Chimpanzini Bananini",
+            "rarity": "Epic + Legendary",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x2",
+            "cash_reward": "$25K",
+            "base_reward": "+1",
+            "special": "Diamond Slap, Grapple Hook, Taser Gun"
+        },
+        {
+            "level": 4,
+            "cash": "$35M",
+            "brainrots": "Glorbo Fruttodrillo + Chef Crabracadabra",
+            "rarity": "Legendary",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x3",
+            "cash_reward": "$50K",
+            "base_reward": "+1",
+            "special": "Emerald Slap, Invisibility Cloak, Boogie Bomb"
+        },
+        {
+            "level": 5,
+            "cash": "$100M",
+            "brainrots": "Orangutini Ananassini + Frigo Camelo",
+            "rarity": "Mythic",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x4",
+            "cash_reward": "$100K",
+            "base_reward": "+1",
+            "special": "Ruby Slap, Medusa’s Head"
+        },
+        {
+            "level": 6,
+            "cash": "$350M",
+            "brainrots": "Bombardiro Crocodilo",
+            "rarity": "Mythic",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x5",
+            "cash_reward": "$250K",
+            "base_reward": "+1",
+            "special": "Dark Matter Slap, Web Slinger"
+        },
+        {
+            "level": 7,
+            "cash": "$1B",
+            "brainrots": "Bombombini Gusini",
+            "rarity": "Mythic",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x6",
+            "cash_reward": "$500K",
+            "base_reward": "+1",
+            "special": "Flame Slap, Quantum Cloner, All Seeing Sentry"
+        },
+        {
+            "level": 8,
+            "cash": "$5B",
+            "brainrots": "Te Te Te Sahur",
+            "rarity": "Mythic",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x7",
+            "cash_reward": "$1M",
+            "base_reward": "+1",
+            "special": "Nuclear Slap, Rainbowrath Sword"
+        },
+        {
+            "level": 9,
+            "cash": "$12.5B",
+            "brainrots": "Cocofanto Elefanto",
+            "rarity": "Brainrot God",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x8",
+            "cash_reward": "$5M",
+            "base_reward": "+1",
+            "special": "Galaxy Slap, Laser Cape"
+        },
+        {
+            "level": 10,
+            "cash": "$125B",
+            "brainrots": "Girafa Celestre",
+            "rarity": "Brainrot God",
+            "tag": "3rd Floor",
+            "tag_kind": "floor",
+            "multiplier": "x9",
+            "cash_reward": "$25M",
+            "base_reward": "+1 & 3rd Floor",
+            "special": "Glitched Slap, Body Swap Potion"
+        },
+        {
+            "level": 11,
+            "cash": "$800B",
+            "brainrots": "Tralalero Tralala",
+            "rarity": "Brainrot God",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x10",
+            "cash_reward": "$100M",
+            "base_reward": "+1",
+            "special": "Splatter Slap, Paintball Gun"
+        },
+        {
+            "level": 12,
+            "cash": "$3.5T",
+            "brainrots": "Odin Din Din Dun",
+            "rarity": "Brainrot God",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x11",
+            "cash_reward": "$500M",
+            "base_reward": "+1",
+            "special": "Heart Balloon, Magnet"
+        },
+        {
+            "level": 13,
+            "cash": "$14T",
+            "brainrots": "Trenostruzzo Turbo 3000",
+            "rarity": "Brainrot God",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x12",
+            "cash_reward": "$1B",
+            "base_reward": "+1",
+            "special": "Megaphone, BeeHive"
+        },
+        {
+            "level": 14,
+            "cash": "$40T",
+            "brainrots": "Trippi Troppi Troppa Trippa",
+            "rarity": "Brainrot God",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x13",
+            "cash_reward": "$2.5T",
+            "base_reward": "+1",
+            "special": "Gummy Bear, Subspace Mine"
+        },
+        {
+            "level": 15,
+            "cash": "$100T",
+            "brainrots": "Pakrahmatmamat",
+            "rarity": "Brainrot God",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x15",
+            "cash_reward": "$10T",
+            "base_reward": "+1",
+            "special": "Heatseeker"
+        },
+        {
+            "level": 16,
+            "cash": "$1Qa",
+            "brainrots": "Los Tralaleritos",
+            "rarity": "Secret",
+            "tag": "First Secret Requirement",
+            "tag_kind": "secret",
+            "multiplier": "x16",
+            "cash_reward": "$25T",
+            "base_reward": "+1",
+            "special": "Attack Doge"
+        },
+        {
+            "level": 17,
+            "cash": "$2Qa",
+            "brainrots": "Job Job Job Sahur + Chicleteira Bicicleteira",
+            "rarity": "Secret",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x17",
+            "cash_reward": "$50T",
+            "base_reward": "+1",
+            "special": "Giant Potion"
+        },
+        {
+            "level": 18,
+            "cash": "$10Qa",
+            "brainrots": "Graipuss Medussi",
+            "rarity": "Secret",
+            "tag": null,
+            "tag_kind": null,
+            "multiplier": "x18",
+            "cash_reward": "$100T",
+            "base_reward": "+1",
+            "special": "Flash Teleport"
+        },
+        {
+            "level": 19,
+            "cash": "$30Qa",
+            "brainrots": "La Grande Combinasion",
+            "rarity": "Secret",
+            "tag": "Current Max",
+            "tag_kind": "max",
+            "multiplier": "x19",
+            "cash_reward": "$250T",
+            "base_reward": "+1",
+            "special": "Grief Shield"
+        }
+    ]
+}
