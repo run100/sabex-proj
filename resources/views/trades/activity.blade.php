@@ -1,10 +1,13 @@
 @extends('trades.layout')
 
 @section('content')
-<h1 class="mb-4 text-2xl font-black">Activity</h1>
-<nav class="mb-6 flex flex-wrap gap-2 text-sm">
-  @foreach(['all','open','pending','completed','failed','disputed'] as $tab)
-    <a href="/activity?status={{ $tab }}" class="rounded-full px-3 py-1 {{ ($status ?? 'all') === $tab ? 'bg-cyan-700 text-cyan-50' : 'border border-white/15 text-slate-300' }}">{{ ucfirst($tab) }}</a>
+<section class="trades-home-hero">
+  <h1>Steal a Brainrot Trade Activity</h1>
+  <p class="trades-home-hero__lead">Browse recent Steal a Brainrot trading activity, including newly posted, joined, pending, completed and failed trades. Search by Roblox username or user ID to view a player's trade activity.</p>
+</section>
+<nav class="trades-activity-tabs" aria-label="Trade status">
+  @foreach(['all' => 'All', 'pending' => 'Pending', 'completed' => 'Completed', 'failed' => 'Failed'] as $tab => $label)
+    <a href="/user/activity?status={{ $tab }}" class="trades-activity-tabs__item{{ ($status ?? 'all') === $tab ? ' is-active' : '' }}">{{ $label }} <span class="trades-activity-tabs__count">{{ $counts[$tab] ?? 0 }}</span></a>
   @endforeach
 </nav>
 <div class="grid gap-4">
@@ -14,4 +17,7 @@
     <p class="text-slate-500">No trades in this tab.</p>
   @endforelse
 </div>
+@if(method_exists($listings, 'links'))
+  {{ $listings->withQueryString()->onEachSide(1)->links('trades.partials.pagination') }}
+@endif
 @endsection

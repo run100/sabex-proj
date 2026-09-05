@@ -10,6 +10,7 @@ trait CreatesTradeTables
     private function createTradeTables(): void
     {
         foreach ([
+            'seo_access_logs',
             'seo_trade_user_stats',
             'seo_trade_user_blocks',
             'seo_trade_reports',
@@ -20,6 +21,8 @@ trait CreatesTradeTables
             'seo_trade_listing_item_traits',
             'seo_trade_listing_items',
             'seo_trade_listings',
+            'seo_trade_email_codes',
+            'seo_trade_auth_accounts',
             'seo_trade_users',
         ] as $table) {
             Schema::dropIfExists($table);
@@ -27,16 +30,57 @@ trait CreatesTradeTables
 
         Schema::create('seo_trade_users', function (Blueprint $table): void {
             $table->id();
-            $table->char('public_id', 26)->unique();
-            $table->string('roblox_sub', 64)->unique();
+            $table->char('public_id', 26);
+            $table->char('profile_id', 26);
+            $table->string('roblox_sub', 64)->nullable();
+            $table->unsignedBigInteger('roblox_user_id')->nullable();
             $table->string('username', 100);
             $table->string('display_name', 100)->nullable();
             $table->string('avatar_url', 500)->nullable();
             $table->string('profile_url', 500)->nullable();
+            $table->string('email')->nullable();
+            $table->timestamp('email_verified_at')->nullable();
             $table->string('account_status', 16)->default('active');
+            $table->string('profile_visibility', 16)->default('public');
+            $table->string('moderation_status', 16)->default('clear');
+            $table->boolean('profile_index_eligible')->default(false);
+            $table->timestamp('deleted_at')->nullable();
+            $table->boolean('posting_approved')->default(true);
+            $table->timestamp('posting_approved_at')->nullable();
+            $table->string('password')->nullable();
             $table->string('remember_token', 100)->nullable();
+            $table->string('registered_ip', 45)->nullable();
+            $table->timestamp('last_login_at')->nullable();
+            $table->string('last_login_ip', 45)->nullable();
+            $table->timestamps();
+            $table->unique('public_id', 'uk_trade_users_public_id');
+            $table->unique('profile_id', 'uk_trade_users_profile_id');
+            $table->unique('roblox_sub', 'uk_trade_users_roblox_sub');
+            $table->unique('roblox_user_id', 'uk_trade_users_roblox_user_id');
+            $table->unique('email', 'uk_trade_users_email');
+        });
+        Schema::create('seo_trade_auth_accounts', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->string('provider', 16);
+            $table->string('provider_uid');
+            $table->string('provider_username', 100)->nullable();
+            $table->string('avatar_url', 500)->nullable();
+            $table->timestamp('bound_at')->nullable();
             $table->timestamp('last_login_at')->nullable();
             $table->timestamps();
+            $table->unique(['provider', 'provider_uid']);
+            $table->unique(['user_id', 'provider']);
+        });
+        Schema::create('seo_trade_email_codes', function (Blueprint $table): void {
+            $table->id();
+            $table->string('email');
+            $table->char('code', 6);
+            $table->string('purpose', 16)->default('login');
+            $table->unsignedTinyInteger('attempts')->default(0);
+            $table->timestamp('expires_at');
+            $table->timestamp('used_at')->nullable();
+            $table->timestamp('created_at')->nullable();
         });
         Schema::create('seo_trade_listings', function (Blueprint $table): void {
             $table->id();
@@ -50,6 +94,7 @@ trait CreatesTradeTables
             $table->decimal('value_difference_snapshot', 20, 4)->default(0);
             $table->decimal('difference_percent_snapshot', 12, 4)->nullable();
             $table->string('note', 280)->nullable();
+            $table->string('posted_ip', 45)->nullable();
             $table->unsignedInteger('views_count')->default(0);
             $table->timestamp('accepted_at')->nullable();
             $table->timestamp('pending_at')->nullable();
@@ -165,6 +210,17 @@ trait CreatesTradeTables
             $table->unsignedInteger('trades_disputed')->default(0);
             $table->decimal('completion_rate', 8, 4)->nullable();
             $table->timestamp('updated_at')->nullable();
+        });
+        Schema::create('seo_access_logs', function (Blueprint $table): void {
+            $table->id();
+            $table->string('actor_type', 16);
+            $table->unsignedBigInteger('actor_id')->nullable();
+            $table->string('action', 32);
+            $table->string('ip', 45)->nullable();
+            $table->string('user_agent', 500)->nullable();
+            $table->string('subject_type', 32)->nullable();
+            $table->unsignedBigInteger('subject_id')->nullable();
+            $table->timestamp('created_at')->nullable();
         });
     }
 }

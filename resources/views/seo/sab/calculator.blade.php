@@ -362,25 +362,24 @@
         <span>↻</span><span>{{ $calcUi['clearAll'] ?? 'Clear All' }}</span>
       </button>
     </div>
-    @if(!empty($tradePostMode))
-    <div class="border-t border-white/10 p-4 sm:p-6">
-      @if(!empty($schemaMissing))
-        <p class="text-amber-200 text-sm">Trade tables are not installed yet. Review database/schema/seo-trades.sql first.</p>
-      @elseif(empty($tradeUser))
-        <a href="/auth/roblox" class="inline-flex rounded-full bg-cyan-700 px-4 py-2 text-sm font-bold text-cyan-50">Sign in with Roblox to publish</a>
-      @else
-        <div class="flex flex-wrap items-end gap-3">
-          <label class="block min-w-[16rem] flex-1 text-sm text-slate-400">
-            Note
-            <input type="text" maxlength="280" data-trade-note class="mt-1 w-full rounded border border-white/10 bg-slate-950 px-3 py-2 text-white">
-          </label>
-          <button type="button" data-publish-trade class="rounded-full bg-cyan-700 px-4 py-2 text-sm font-bold text-cyan-50">Publish trade</button>
-        </div>
-        <p class="mt-2 text-xs text-slate-500" data-publish-status></p>
-      @endif
-    </div>
+  </div>
+
+  @if(!empty($tradePostMode))
+  <div class="trades-publish-bar{{ !empty($tradeUser) && ! $tradeUser->canPost() ? ' trades-publish-bar--pending' : '' }}">
+    @if(!empty($schemaMissing))
+      <p class="trades-publish-bar__hint">Trade tables are not installed yet. Review database/schema/seo-trades.sql first.</p>
+    @elseif(!empty($tradeUser) && ! $tradeUser->canPost())
+      <p class="trades-publish-bar__hint">This account is waiting for posting approval.</p>
+    @else
+      <label class="trades-publish-bar__note">
+        Note
+        <input type="text" maxlength="280" data-trade-note>
+      </label>
+      <button type="button" class="trades-publish-btn" data-publish-trade>Publish trade</button>
+      <p class="trades-publish-bar__status" data-publish-status></p>
     @endif
   </div>
+  @endif
 
   <div class="sab-calc-help-panel">
     <button type="button" class="sab-calc-help-toggle" data-help-toggle>
@@ -485,24 +484,6 @@
         <button type="button" style="width:100%;border-radius:9999px;background:#22c55e;padding:.625rem 1rem;font-size:.9375rem;font-weight:900;color:#fff;cursor:pointer;border:none" data-save>{{ $calcUi['addItem'] ?? 'Add Item' }}</button>
       </div>
     </div>
-    @if(!empty($tradePostMode))
-    <div class="border-t border-white/10 p-4 sm:p-6">
-      @if(!empty($schemaMissing))
-        <p class="text-amber-200 text-sm">Trade tables are not installed yet. Review database/schema/seo-trades.sql first.</p>
-      @elseif(empty($tradeUser))
-        <a href="/auth/roblox" class="inline-flex rounded-full bg-cyan-700 px-4 py-2 text-sm font-bold text-cyan-50">Sign in with Roblox to publish</a>
-      @else
-        <div class="flex flex-wrap items-end gap-3">
-          <label class="block min-w-[16rem] flex-1 text-sm text-slate-400">
-            Note
-            <input type="text" maxlength="280" data-trade-note class="mt-1 w-full rounded border border-white/10 bg-slate-950 px-3 py-2 text-white">
-          </label>
-          <button type="button" data-publish-trade class="rounded-full bg-cyan-700 px-4 py-2 text-sm font-bold text-cyan-50">Publish trade</button>
-        </div>
-        <p class="mt-2 text-xs text-slate-500" data-publish-status></p>
-      @endif
-    </div>
-    @endif
   </div>
 </section>
 
@@ -1210,45 +1191,49 @@
   searchTrait.addEventListener('input', renderTraits);
   modal.addEventListener('click', event => { if (event.target === modal) closeModal(); });
 
-  const publishBtn = root.querySelector('[data-publish-trade]');
-  if (publishBtn) {
-    publishBtn.addEventListener('click', async () => {
-      const status = root.querySelector('[data-publish-status]');
-      const serialize = (items) => items.map((item) => {
-        const calc = calcItem(item);
-        return {
-          brainrot: { slug: item.brainrot.slug, name: item.brainrot.name, image: item.brainrot.image || '' },
-          mutation: item.mutation,
-          traits: item.traits,
-          quantity: item.quantity,
-          value: calc.value,
-        };
-      });
-      try {
-        const response = await fetch(@json($tradePublishUrl ?? '/api/v1/trades'), {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}',
-          },
-          body: JSON.stringify({
-            offering: serialize(state.offer),
-            looking_for: serialize(state.receive),
-            note: root.querySelector('[data-trade-note]')?.value || '',
-          }),
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!payload.success) {
-          throw new Error(payload.error?.message || payload.message || 'Publish failed');
-        }
-        window.location.href = payload.data?.redirect || '/';
-      } catch (error) {
-        if (status) status.textContent = error.message;
-      }
+  const publishTrade = async () => {
+    const status = root.querySelector('[data-publish-status]');
+    @if(empty($tradeUser))
+    window.location.href = '/auth/roblox?return_to=/trading/new';
+    return;
+    @endif
+    const serialize = (items) => items.map((item) => {
+      const calc = calcItem(item);
+      return {
+        brainrot: { slug: item.brainrot.slug, name: item.brainrot.name, image: item.brainrot.image || '' },
+        mutation: item.mutation,
+        traits: item.traits,
+        quantity: item.quantity,
+        value: calc.value,
+      };
     });
-  }
+    try {
+      const response = await fetch(@json($tradePublishUrl ?? '/api/v1/trading/trades'), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}',
+        },
+        body: JSON.stringify({
+          offering: serialize(state.offer),
+          looking_for: serialize(state.receive),
+          note: root.querySelector('[data-trade-note]')?.value || '',
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!payload.success) {
+        throw new Error(payload.error?.message || payload.message || 'Publish failed');
+      }
+      window.location.href = payload.data?.redirect || '/';
+    } catch (error) {
+      if (status) status.textContent = error.message;
+    }
+  };
+  root.querySelectorAll('[data-publish-trade]').forEach((publishBtn) => {
+    publishBtn.addEventListener('click', publishTrade);
+  });
 
   renderHelpSection();
 

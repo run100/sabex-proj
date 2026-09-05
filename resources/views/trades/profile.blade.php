@@ -2,13 +2,13 @@
 
 @section('content')
 <div class="mb-6 flex items-center gap-4">
-  @if($profile->avatar_url)
-    <img src="{{ $profile->avatar_url }}" alt="" width="72" height="72" class="h-18 w-18 rounded-full object-cover">
-  @endif
+  @include('trades.partials.avatar', ['url' => $profile->avatar_url, 'size' => 72])
   <div>
-    <h1 class="text-2xl font-black">{{ $profile->display_name ?: $profile->username }}</h1>
-    <p class="text-slate-400"><span>@</span>{{ $profile->username }} · Roblox ID {{ $profile->roblox_sub }}</p>
-    <a class="text-cyan-300 text-sm" href="{{ $profile->profile_url ?: 'https://www.roblox.com/users/'.$profile->roblox_sub.'/profile' }}" rel="nofollow noopener" target="_blank">View on Roblox</a>
+    <h1 class="text-2xl font-black">{{ ($profile->display_name ?: $profile->username) }}'s Steal a Brainrot Trading Profile</h1>
+    <p class="text-slate-400"><span>@</span>{{ $profile->username }}@if($profile->roblox_sub && !str_starts_with($profile->roblox_sub, 'local:')) · Roblox ID {{ $profile->roblox_sub }}@endif</p>
+    @if($profile->robloxProfileUrl())
+    <a class="text-cyan-300 text-sm" href="{{ $profile->robloxProfileUrl() }}" rel="nofollow noopener" target="_blank">View on Roblox</a>
+    @endif
   </div>
 </div>
 <dl class="mb-8 grid grid-cols-2 gap-3 text-sm md:grid-cols-3">

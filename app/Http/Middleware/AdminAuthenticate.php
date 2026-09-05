@@ -10,7 +10,7 @@ class AdminAuthenticate
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! auth()->guard('web')->check()) {
+        if (! auth()->guard('admin')->check()) {
             if ($request->expectsJson()) {
                 abort(404);
             }

@@ -16,9 +16,11 @@ trait CreatesSabWikiTables
             'seo_item_variants',
             'seo_items',
             'seo_news_articles',
+            'seo_access_logs',
             'seo_value_sources',
             'seo_games',
             'seo_sites',
+            'seo_users',
         ] as $table) {
             Schema::dropIfExists($table);
         }
@@ -129,6 +131,17 @@ trait CreatesSabWikiTables
             $table->string('source_payload_hash')->nullable();
             $table->timestamps();
         });
+        Schema::create('seo_users', function (Blueprint $table): void {
+            $table->id();
+            $table->string('email')->unique();
+            $table->string('password');
+            $table->string('name', 100);
+            $table->string('role', 32)->default('super_admin');
+            $table->rememberToken();
+            $table->timestamp('last_login_at')->nullable();
+            $table->string('last_login_ip', 45)->nullable();
+            $table->timestamps();
+        });
         Schema::create('seo_news_articles', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('seo_site_id');
@@ -145,6 +158,17 @@ trait CreatesSabWikiTables
             $table->integer('sort_order')->default(0);
             $table->boolean('is_system_log')->default(false);
             $table->timestamps();
+        });
+        Schema::create('seo_access_logs', function (Blueprint $table): void {
+            $table->id();
+            $table->string('actor_type', 16);
+            $table->unsignedBigInteger('actor_id')->nullable();
+            $table->string('action', 32);
+            $table->string('ip', 45)->nullable();
+            $table->string('user_agent', 500)->nullable();
+            $table->string('subject_type', 32)->nullable();
+            $table->unsignedBigInteger('subject_id')->nullable();
+            $table->timestamp('created_at')->nullable();
         });
     }
 }

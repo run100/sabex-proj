@@ -3,6 +3,7 @@
 use App\Http\Middleware\AdminAllowIp;
 use App\Http\Middleware\AdminAuthenticate;
 use App\Http\Middleware\AdminNoIndex;
+use App\Http\Middleware\RedirectWwwToApex;
 use App\Http\Middleware\TradesAuthenticate;
 use App\Support\SabHost;
 use Illuminate\Console\Scheduling\Schedule;
@@ -30,6 +31,9 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustHosts(at: fn () => SabHost::trustedHosts());
+        $middleware->web(prepend: [
+            RedirectWwwToApex::class,
+        ]);
         $middleware->alias([
             'admin.ip' => AdminAllowIp::class,
             'admin.auth' => AdminAuthenticate::class,

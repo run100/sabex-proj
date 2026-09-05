@@ -6,23 +6,26 @@ use App\Http\Controllers\Controller;
 use App\Models\TradeListing;
 use App\Models\TradeUser;
 use App\Services\Trades\TradeStatsService;
-use App\Support\SabHost;
+use App\Support\TradeCanonical;
+use App\Support\TradeIndexEligibility;
+use App\Support\TradeProfileAccess;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
     use TradePageSupport;
 
-    public function __invoke(string $roblox_sub, TradeStatsService $stats): View
+    public function __invoke(string $profile_id, TradeStatsService $stats): View
     {
         $this->requireSchema();
-        $profile = TradeUser::query()->where('roblox_sub', $roblox_sub)->first();
-        abort_if($profile === null || $profile->account_status === TradeUser::STATUS_DELETED, 404);
+        $profile = TradeUser::findPublic($profile_id);
+        abort_unless(TradeProfileAccess::canAccessProfile($profile), 404);
 
         $active = TradeListing::query()
             ->with(['owner', 'items.traits'])
             ->where('owner_user_id', $profile->id)
             ->where('status', TradeListing::STATUS_OPEN)
+            ->whereHas('owner', fn ($q) => TradeProfileAccess::constrainPublicIdentity($q))
             ->orderByDesc('id')
             ->limit(20)
             ->get();
@@ -32,15 +35,23 @@ class ProfileController extends Controller
             ->where(function ($q) use ($profile): void {
                 $q->where('owner_user_id', $profile->id)->orWhere('counterparty_user_id', $profile->id);
             })
+            ->whereHas('owner', fn ($q) => TradeProfileAccess::constrainPublicIdentity($q))
+            ->where(function ($q): void {
+                $q->whereNull('counterparty_user_id')
+                    ->orWhereHas('counterparty', fn ($inner) => TradeProfileAccess::constrainPublicIdentity($inner));
+            })
             ->orderByDesc('completed_at')
             ->limit(20)
             ->get();
 
+        $name = $profile->display_name ?: $profile->username;
+        $indexable = TradeIndexEligibility::isEligible($profile);
+
         return view('trades.profile', $this->page([
-            'seoTitle' => ($profile->display_name ?: $profile->username).' — SAB Trades',
-            'seoDescription' => 'Public Steal a Brainrot trade profile.',
-            'canonical' => SabHost::origin('trades').'/u/'.$profile->roblox_sub,
-            'robots' => 'noindex,follow',
+            'seoTitle' => $name.' Steal a Brainrot Trades & Trade History | SABExistCount',
+            'seoDescription' => 'View '.$name.'\'s Steal a Brainrot trading profile, active SAB trades and completed trade history on SABExistCount.',
+            'canonical' => TradeCanonical::absolute($profile->profilePath()),
+            'robots' => $indexable ? 'index,follow' : 'noindex,follow',
             'profile' => $profile,
             'stats' => $stats->forUser($profile),
             'activeListings' => $active,

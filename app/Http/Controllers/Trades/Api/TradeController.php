@@ -61,12 +61,13 @@ class TradeController extends Controller
                     auth('trades')->user(),
                     $offering,
                     $looking,
-                    $request->input('note')
+                    $request->input('note'),
+                    \App\Support\AccessLogService::ip($request)
                 );
 
                 return TradeApi::ok([
                     'public_id' => $listing->public_id,
-                    'redirect' => '/t/'.$listing->public_id,
+                    'redirect' => \App\Support\TradePaths::show($listing->public_id),
                     'trade' => TradePresenter::listing($listing),
                 ], 201);
             });
@@ -77,21 +78,33 @@ class TradeController extends Controller
         }
     }
 
-    public function show(string $public_id, TradeListingService $listings): JsonResponse
+    public function pending(Request $request, TradeListingService $listings): JsonResponse
+    {
+        $this->requireSchema();
+        $page = $listings->pending($request->only(['page', 'limit', 'sort']));
+
+        return TradeApi::ok([
+            'items' => collect($page->items())->map(fn ($row) => TradePresenter::listing($row))->all(),
+            'page' => $page->currentPage(),
+            'last_page' => $page->lastPage(),
+        ]);
+    }
+
+    public function show(string $ulid, TradeListingService $listings): JsonResponse
     {
         $this->requireSchema();
         try {
-            return TradeApi::ok(['trade' => TradePresenter::listing($listings->findPublic($public_id), true)]);
+            return TradeApi::ok(['trade' => TradePresenter::listing($listings->findPublic($ulid), true)]);
         } catch (TradeException $e) {
             return TradeApi::fromException($e);
         }
     }
 
-    public function cancel(string $public_id, TradeListingService $listings): JsonResponse
+    public function cancel(string $ulid, TradeListingService $listings): JsonResponse
     {
         $this->requireSchema();
         try {
-            $listing = $listings->cancel(auth('trades')->user(), $listings->findPublic($public_id));
+            $listing = $listings->cancel(auth('trades')->user(), $listings->findPublic($ulid));
 
             return TradeApi::ok(['trade' => TradePresenter::listing($listing)]);
         } catch (TradeException $e) {
@@ -99,12 +112,12 @@ class TradeController extends Controller
         }
     }
 
-    public function join(Request $request, string $public_id, TradeListingService $listings, TradeJoinService $joins): JsonResponse
+    public function join(Request $request, string $ulid, TradeListingService $listings, TradeJoinService $joins): JsonResponse
     {
         $this->requireSchema();
         try {
-            return $this->idempotent($request, 'trades.join.'.$public_id, function () use ($request, $public_id, $listings, $joins) {
-                $row = $joins->join(auth('trades')->user(), $listings->findPublic($public_id), $request->input('note'));
+            return $this->idempotent($request, 'trades.join.'.$ulid, function () use ($request, $ulid, $listings, $joins) {
+                $row = $joins->join(auth('trades')->user(), $listings->findPublic($ulid), $request->input('note'));
 
                 return TradeApi::ok(['join_request' => TradePresenter::join($row)], 201);
             });
@@ -113,11 +126,11 @@ class TradeController extends Controller
         }
     }
 
-    public function joinRequests(string $public_id, TradeListingService $listings, TradeJoinService $joins): JsonResponse
+    public function joinRequests(string $ulid, TradeListingService $listings, TradeJoinService $joins): JsonResponse
     {
         $this->requireSchema();
         try {
-            $rows = $joins->forListing(auth('trades')->user(), $listings->findPublic($public_id));
+            $rows = $joins->forListing(auth('trades')->user(), $listings->findPublic($ulid));
 
             return TradeApi::ok(['items' => array_map(fn ($row) => TradePresenter::join($row), $rows)]);
         } catch (TradeException $e) {
@@ -125,7 +138,7 @@ class TradeController extends Controller
         }
     }
 
-    public function hide(string $public_id, TradeListingService $listings, TradeModerationService $moderation): JsonResponse
+    public function hide(string $ulid, TradeListingService $listings, TradeModerationService $moderation): JsonResponse
     {
         $this->requireSchema();
         $user = auth('trades')->user();
@@ -133,7 +146,7 @@ class TradeController extends Controller
             return TradeApi::fromException(TradeException::forbidden('AUTH_REQUIRED', 'Moderator only.'));
         }
         try {
-            $listing = $listings->hide($user, $listings->findPublic($public_id));
+            $listing = $listings->hide($user, $listings->findPublic($ulid));
 
             return TradeApi::ok(['trade' => TradePresenter::listing($listing)]);
         } catch (TradeException $e) {
@@ -141,14 +154,14 @@ class TradeController extends Controller
         }
     }
 
-    public function confirm(Request $request, string $public_id, TradeListingService $listings, TradeConfirmationService $confirmations): JsonResponse
+    public function confirm(Request $request, string $ulid, TradeListingService $listings, TradeConfirmationService $confirmations): JsonResponse
     {
         $this->requireSchema();
         try {
-            return $this->idempotent($request, 'trades.confirm.'.$public_id, function () use ($request, $public_id, $listings, $confirmations) {
+            return $this->idempotent($request, 'trades.confirm.'.$ulid, function () use ($request, $ulid, $listings, $confirmations) {
                 $listing = $confirmations->confirm(
                     auth('trades')->user(),
-                    $listings->findPublic($public_id),
+                    $listings->findPublic($ulid),
                     (string) $request->input('confirmation'),
                     $request->input('note')
                 );

@@ -451,8 +451,15 @@ class SabWikiPageTest extends TestCase
 
         $response = $this->get('/sitemap.xml');
         $response->assertOk();
-        $sitemap = (string) $response->getContent();
-        $origin = 'https://www.sabexistcount.com';
+        $index = (string) $response->getContent();
+        $origin = 'https://sabexistcount.com';
+        $this->assertStringContainsString('<sitemapindex', $index);
+        $this->assertStringContainsString($origin.'/sitemaps/main.xml', $index);
+        $this->assertStringNotContainsString('trades.sabexistcount.com', $index);
+
+        $main = $this->get('/sitemaps/main.xml');
+        $main->assertOk();
+        $sitemap = (string) $main->getContent();
         $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'</loc>'));
         $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/wiki</loc>'));
         $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/sab-exist-count-list</loc>'));
@@ -466,6 +473,10 @@ class SabWikiPageTest extends TestCase
         $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/news</loc>'));
         $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/products/rendered-brainrot</loc>'));
         $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/about-us</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/trading</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/trading/new</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/trading/pending</loc>'));
+        $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/trading/completed</loc>'));
         foreach (SabWikiPageDefinitions::shippingPageSlugs() as $slug) {
             $this->assertSame(1, substr_count($sitemap, '<loc>'.$origin.'/'.$slug.'</loc>'));
         }

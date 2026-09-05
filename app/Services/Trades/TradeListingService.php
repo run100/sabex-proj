@@ -9,6 +9,8 @@ use App\Models\TradeListing;
 use App\Models\TradeListingItem;
 use App\Models\TradeListingItemTrait;
 use App\Models\TradeUser;
+use App\Support\AccessLogService;
+use App\Support\TradeProfileAccess;
 use App\Support\TradeSchema;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -30,14 +32,15 @@ class TradeListingService
      * @param  array<int, mixed>  $offering
      * @param  array<int, mixed>  $lookingFor
      */
-    public function create(TradeUser $user, array $offering, array $lookingFor, ?string $note = null): TradeListing
+    public function create(TradeUser $user, array $offering, array $lookingFor, ?string $note = null, ?string $ip = null): TradeListing
     {
         $this->assertActive($user);
+        $this->assertCanPost($user);
         $this->assertPostLimits($user);
 
         $snapshot = $this->valuation->snapshot($offering, $lookingFor);
 
-        return DB::transaction(function () use ($user, $snapshot, $note): TradeListing {
+        return DB::transaction(function () use ($user, $snapshot, $note, $ip): TradeListing {
             $listing = TradeListing::query()->create([
                 'owner_user_id' => $user->id,
                 'status' => TradeListing::STATUS_OPEN,
@@ -48,11 +51,15 @@ class TradeListingService
                 'difference_percent_snapshot' => $snapshot['difference_percent'],
                 'note' => $note !== null ? mb_substr(trim($note), 0, 280) : null,
                 'expires_at' => now()->addHours((int) config('sab-trades.trade_expire_hours', 72)),
+                ...AccessLogService::attrs('seo_trade_listings', [
+                    'posted_ip' => $ip,
+                ]),
             ]);
 
             $this->writeItems($listing, $snapshot['offering']);
             $this->writeItems($listing, $snapshot['looking_for']);
             $this->event($listing, 'trade_posted', $user);
+            AccessLogService::write('trade_user', (int) $user->id, 'publish', $ip, 'trade_listing', (int) $listing->id);
 
             return $listing->fresh(['owner', 'items.traits']) ?? $listing;
         });
@@ -78,11 +85,82 @@ class TradeListingService
 
     public function hide(TradeUser $actor, TradeListing $listing): TradeListing
     {
+        if (! app(TradeModerationService::class)->isModerator($actor)) {
+            throw TradeException::forbidden('AUTH_REQUIRED', 'Moderator only.');
+        }
         $listing->status = TradeListing::STATUS_HIDDEN;
         $listing->save();
         $this->event($listing, 'trade_hidden', $actor);
 
         return $listing;
+    }
+
+    public function hideByAdmin(TradeListing $listing): TradeListing
+    {
+        if ($listing->status === TradeListing::STATUS_HIDDEN) {
+            throw TradeException::invalid('TRADE_ALREADY_HIDDEN', 'This trade is already hidden.');
+        }
+
+        $previous = $listing->status;
+        $listing->status = TradeListing::STATUS_HIDDEN;
+        $listing->save();
+        $this->event($listing, 'trade_hidden', null, [
+            'admin' => true,
+            'previous_status' => $previous,
+        ]);
+
+        return $listing;
+    }
+
+    public function unhide(TradeListing $listing): TradeListing
+    {
+        if ($listing->status !== TradeListing::STATUS_HIDDEN) {
+            throw TradeException::invalid('TRADE_NOT_HIDDEN', 'This trade is not hidden.');
+        }
+
+        $listing->status = $this->statusBeforeHide($listing);
+        $listing->save();
+        $this->event($listing, 'trade_unhidden', null, ['admin' => true]);
+
+        return $listing;
+    }
+
+    public function forceClose(TradeListing $listing): TradeListing
+    {
+        if (! $listing->isOpen() && ! $listing->isPendingLike() && $listing->status !== TradeListing::STATUS_HIDDEN) {
+            throw TradeException::invalid('TRADE_NOT_CLOSABLE', 'This trade can no longer be force closed.');
+        }
+
+        return DB::transaction(function () use ($listing): TradeListing {
+            $listing->status = TradeListing::STATUS_CANCELLED;
+            $listing->cancelled_at = now();
+            $listing->save();
+
+            TradeJoinRequest::query()
+                ->where('listing_id', $listing->id)
+                ->where('status', TradeJoinRequest::STATUS_REQUESTED)
+                ->update([
+                    'status' => TradeJoinRequest::STATUS_CANCELLED,
+                    'cancelled_at' => now(),
+                ]);
+
+            $this->event($listing, 'trade_cancelled', null, ['admin' => true]);
+
+            $listing->load(['owner', 'counterparty']);
+            foreach ([$listing->owner, $listing->counterparty] as $user) {
+                if ($user) {
+                    $this->notifications->notify(
+                        $user,
+                        'trade_cancelled',
+                        'Trade closed',
+                        'An administrator closed this trade.',
+                        $listing,
+                    );
+                }
+            }
+
+            return $listing;
+        });
     }
 
     /**
@@ -97,6 +175,15 @@ class TradeListingService
     /**
      * @param  array<string, mixed>  $filters
      */
+    public function pending(array $filters = []): LengthAwarePaginator
+    {
+        return $this->filteredQuery($filters, [
+            TradeListing::STATUS_PENDING,
+            TradeListing::STATUS_PENDING_CONFIRMATION,
+        ], true)
+            ->paginate($this->limit((int) ($filters['limit'] ?? 20)), ['*'], 'page', (int) ($filters['page'] ?? 1));
+    }
+
     public function completed(array $filters = []): LengthAwarePaginator
     {
         $query = $this->filteredQuery($filters, [TradeListing::STATUS_COMPLETED]);
@@ -125,6 +212,12 @@ class TradeListingService
             ->where('public_id', $publicId)
             ->first();
         if ($listing === null || $listing->status === TradeListing::STATUS_HIDDEN) {
+            throw TradeException::notFound();
+        }
+        if (! TradeProfileAccess::canShowPublicIdentity($listing->owner)) {
+            throw TradeException::notFound();
+        }
+        if ($listing->counterparty && ! TradeProfileAccess::canShowPublicIdentity($listing->counterparty)) {
             throw TradeException::notFound();
         }
 
@@ -233,11 +326,20 @@ class TradeListingService
      * @param  array<string, mixed>  $filters
      * @param  list<string>  $statuses
      */
-    private function filteredQuery(array $filters, array $statuses): Builder
+    private function filteredQuery(array $filters, array $statuses, bool $requireCounterparty = false): Builder
     {
         $query = TradeListing::query()
-            ->with(['owner', 'items.traits'])
-            ->whereIn('status', $statuses);
+            ->with(['owner', 'counterparty', 'items.traits'])
+            ->whereIn('status', $statuses)
+            ->whereHas('owner', fn (Builder $q) => TradeProfileAccess::constrainPublicIdentity($q));
+        if ($requireCounterparty) {
+            $query->whereHas('counterparty', fn (Builder $q) => TradeProfileAccess::constrainPublicIdentity($q));
+        } else {
+            $query->where(function (Builder $outer): void {
+                $outer->whereNull('counterparty_user_id')
+                    ->orWhereHas('counterparty', fn (Builder $q) => TradeProfileAccess::constrainPublicIdentity($q));
+            });
+        }
 
         if (! empty($filters['want_brainrot_id'])) {
             $id = (int) $filters['want_brainrot_id'];
@@ -288,6 +390,46 @@ class TradeListingService
         if (! $user->isActive()) {
             throw TradeException::banned();
         }
+    }
+
+    private function assertCanPost(TradeUser $user): void
+    {
+        if (! $user->canPost()) {
+            throw TradeException::forbidden(
+                'POSTING_NOT_APPROVED',
+                'This account is waiting for posting approval.'
+            );
+        }
+    }
+
+    private function statusBeforeHide(TradeListing $listing): string
+    {
+        $event = TradeEvent::query()
+            ->where('listing_id', $listing->id)
+            ->where('event_type', 'trade_hidden')
+            ->orderByDesc('id')
+            ->first();
+        $previous = is_array($event?->metadata) ? ($event->metadata['previous_status'] ?? null) : null;
+        $allowed = [
+            TradeListing::STATUS_OPEN,
+            TradeListing::STATUS_PENDING,
+            TradeListing::STATUS_PENDING_CONFIRMATION,
+            TradeListing::STATUS_COMPLETED,
+            TradeListing::STATUS_FAILED,
+            TradeListing::STATUS_DISPUTED,
+            TradeListing::STATUS_CANCELLED,
+            TradeListing::STATUS_EXPIRED,
+        ];
+        if (is_string($previous) && in_array($previous, $allowed, true)) {
+            return $previous;
+        }
+        if ($listing->counterparty_user_id) {
+            return $listing->confirmations()->exists()
+                ? TradeListing::STATUS_PENDING_CONFIRMATION
+                : TradeListing::STATUS_PENDING;
+        }
+
+        return TradeListing::STATUS_OPEN;
     }
 
     /**

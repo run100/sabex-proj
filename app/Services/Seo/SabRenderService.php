@@ -854,7 +854,7 @@ class SabRenderService
 
     /**
      * Public origin for canonical / sitemap / robots on the www host.
-     * Production apex sabexistcount.com is normalized to www.
+     * Production www is normalized to apex sabexistcount.com.
      */
     public function publicWwwOrigin(?SeoSite $site = null): string
     {
@@ -878,86 +878,57 @@ class SabRenderService
 
     public function buildLiveSitemapXml(): string
     {
-        $site = SeoSite::query()->where('slug', self::SITE_SLUG)->firstOrFail();
-        $game = SeoGame::query()
-            ->where('seo_site_id', $site->id)
-            ->where('slug', self::GAME_SLUG)
-            ->firstOrFail();
-        $baseUrl = $this->publicWwwOrigin($site);
-        $items = $this->loadItems($game);
-        $news = $this->loadPublishedNews($site);
-        $staticPages = $this->loadPublishedStaticPages($site);
-        $codesLastmod = (string) $this->codesData()['verified_at'];
-        $urls = [];
+        return app(SabSitemapBuilder::class)->indexXml();
+    }
 
-        foreach (self::HOME_LOCALES as $locale) {
-            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, 'index.html'), 'priority' => '1.0'];
-            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_EXIST_COUNTS_LIST), 'priority' => '0.85'];
-            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_VALUE_LIST), 'priority' => '0.85'];
-            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_TRADING_CALCULATOR), 'priority' => '0.85'];
-            $urls[] = [
-                'loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_CODES),
-                'priority' => '0.9',
-                'lastmod' => $codesLastmod,
-            ];
-            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::gamesIndexPublicPath()), 'priority' => '0.75'];
-            foreach (array_keys(self::gamesCatalog()) as $gameSlug) {
-                $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::gamePublicPath($gameSlug)), 'priority' => '0.7'];
-            }
-        }
+    public function buildLiveSitemapShardXml(string $name): string
+    {
+        return app(SabSitemapBuilder::class)->shardXml($name);
+    }
 
-        $en = self::DEFAULT_LOCALE;
-        $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $en, self::PAGE_EXIST_COUNT_GALLERY), 'priority' => '0.8'];
-        $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $en, self::PAGE_VALUE_CHANGES), 'priority' => '0.85'];
-        $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $en, self::PAGE_WIKI), 'priority' => '0.85'];
-        foreach (SabWikiPageDefinitions::shippingPageSlugs() as $slug) {
-            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $en, $slug), 'priority' => '0.8'];
-        }
-        $urls[] = [
-            'loc' => $this->localePublicUrl($baseUrl, $en, 'news'),
-            'priority' => '0.75',
-            'lastmod' => optional($news->where('locale', $en)->sortByDesc('updated_at')->first())->updated_at?->toDateString(),
-        ];
+    public function loadItemsForSitemap(SeoGame $game): Collection
+    {
+        return $this->loadItems($game);
+    }
 
-        foreach ($items->filter(fn (SeoItem $item) => self::shouldRenderProductHtml($item) && self::shouldIndexProductSlug((string) $item->slug)) as $item) {
-            $urls[] = [
-                'loc' => $this->localePublicUrl($baseUrl, $en, 'products/'.self::productPublicSlug($item->slug)),
-                'priority' => '0.8',
-                'lastmod' => optional($item->updated_at)->toDateString(),
-            ];
-        }
+    public function loadPublishedNewsForSitemap(SeoSite $site): Collection
+    {
+        return $this->loadPublishedNews($site);
+    }
 
-        foreach ($news->where('locale', $en) as $article) {
-            $urls[] = [
-                'loc' => $this->localePublicUrl($baseUrl, $en, 'news/'.$article->slug),
-                'priority' => '0.7',
-                'lastmod' => optional($article->updated_at)->toDateString(),
-            ];
-        }
+    public function loadPublishedStaticPagesForSitemap(SeoSite $site): Collection
+    {
+        return $this->loadPublishedStaticPages($site);
+    }
 
-        $legalSlugs = ['about-us', 'privacy-policy', 'terms-of-service'];
-        $staticBySlug = $staticPages->keyBy('slug');
-        foreach ($legalSlugs as $legalSlug) {
-            $article = $staticBySlug->get($legalSlug);
-            $urls[] = [
-                'loc' => $this->localePublicUrl($baseUrl, $en, $legalSlug),
-                'priority' => '0.5',
-                'lastmod' => optional($article?->updated_at)->toDateString(),
-            ];
-        }
+    public function codesDataForSitemap(): array
+    {
+        return $this->codesData();
+    }
 
-        $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n";
-        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
-        foreach ($urls as $u) {
-            $xml .= "  <url>\n    <loc>".htmlspecialchars((string) $u['loc'], ENT_XML1)."</loc>\n";
-            if (! empty($u['lastmod'])) {
-                $xml .= '    <lastmod>'.$u['lastmod']."</lastmod>\n";
-            }
-            $xml .= '    <priority>'.$u['priority']."</priority>\n  </url>\n";
-        }
-        $xml .= '</urlset>';
+    public function localePublicUrlForSitemap(string $baseUrl, string $locale, string $relativePath): string
+    {
+        return $this->localePublicUrl($baseUrl, $locale, $relativePath);
+    }
 
-        return $xml;
+    public static function sitemapGameSlug(): string
+    {
+        return self::GAME_SLUG;
+    }
+
+    public static function sitemapDefaultLocale(): string
+    {
+        return self::DEFAULT_LOCALE;
+    }
+
+    public static function sitemapShouldRenderProduct(SeoItem $item): bool
+    {
+        return self::shouldRenderProductHtml($item);
+    }
+
+    public static function sitemapShouldIndexProductSlug(string $slug): bool
+    {
+        return self::shouldIndexProductSlug($slug);
     }
 
     private function normalizeWwwOrigin(string $origin): string
@@ -966,8 +937,8 @@ class SabRenderService
         $scheme = $parts['scheme'] ?? 'https';
         $host = $parts['host'] ?? '';
         $port = isset($parts['port']) ? ':'.$parts['port'] : '';
-        if ($host === 'sabexistcount.com') {
-            $host = 'www.sabexistcount.com';
+        if ($host === 'www.sabexistcount.com') {
+            $host = 'sabexistcount.com';
         }
 
         return $scheme.'://'.$host.$port;
@@ -1563,7 +1534,7 @@ class SabRenderService
             Log::info("seo:sab-render-home [{$locale}] rendered");
         }
 
-        $this->renderHomeSitemap($outputPath, $baseUrl, $generatedLocales);
+        Log::warning('seo:sab-render-home skipped sitemap.xml rewrite; run full seo:sab-render.');
         $this->syncStaticCssToWebsite($outputPath);
         $this->syncSabExistCountFavicon($outputPath);
     }
@@ -6564,75 +6535,15 @@ class SabRenderService
 
     private function renderSitemap(string $outputPath, string $baseUrl, Collection $items, Collection $news, Collection $staticPages, array $generatedLocales, ?array $detailLocales = null): void
     {
-        $locales = array_values(array_intersect(self::HOME_LOCALES, $generatedLocales));
-        $detailLocales = $detailLocales === null
-            ? $locales
-            : array_values(array_intersect(self::HOME_LOCALES, $detailLocales));
-        $urls = [];
-        $codesData = $this->codesData();
-        foreach ($locales as $locale) {
-            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, 'index.html'), 'priority' => '1.0'];
-            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_EXIST_COUNTS_LIST), 'priority' => '0.85'];
-            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_TRADING_CALCULATOR), 'priority' => '0.85'];
-            $urls[] = [
-                'loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_CODES),
-                'priority' => '0.9',
-                'lastmod' => $codesData['verified_at'],
-            ];
-            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::gamesIndexPublicPath()), 'priority' => '0.75'];
-            foreach (array_keys(self::gamesCatalog()) as $gameSlug) {
-                $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::gamePublicPath($gameSlug)), 'priority' => '0.7'];
+        $builder = app(SabSitemapBuilder::class);
+        foreach ($builder->staticFiles() as $file) {
+            $full = $outputPath.'/'.$file['path'];
+            $dir = dirname($full);
+            if (! is_dir($dir)) {
+                mkdir($dir, 0755, true);
             }
-            if ($locale !== self::DEFAULT_LOCALE) {
-                continue;
-            }
-            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_GAG2_CALCULATOR . '.html'), 'priority' => '0.82'];
-            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_EXIST_COUNT_GALLERY), 'priority' => '0.8'];
-            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_VALUE_LIST), 'priority' => '0.85'];
-            $urls[] = ['loc' => $this->localePublicUrl($baseUrl, $locale, self::PAGE_VALUE_CHANGES), 'priority' => '0.85'];
-            if (! in_array($locale, $detailLocales, true)) {
-                continue;
-            }
-            $urls[] = [
-                'loc' => $this->localePublicUrl($baseUrl, $locale, 'news/index.html'),
-                'priority' => '0.75',
-                'lastmod' => optional($news->where('locale', $locale)->sortByDesc('updated_at')->first())->updated_at?->toDateString(),
-            ];
-            foreach ($items->filter(fn (SeoItem $item) => self::shouldRenderProductHtml($item) && self::shouldIndexProductSlug((string) $item->slug)) as $item) {
-                $urls[] = [
-                    'loc' => $this->localePublicUrl($baseUrl, $locale, 'products/' . self::productPublicSlug($item->slug) . '.html'),
-                    'priority' => '0.8',
-                    'lastmod' => optional($item->updated_at)->toDateString(),
-                ];
-            }
-            foreach ($news->where('locale', $locale) as $article) {
-                $urls[] = [
-                    'loc' => $this->localePublicUrl($baseUrl, $locale, "news/{$article->slug}.html"),
-                    'priority' => '0.7',
-                    'lastmod' => optional($article->updated_at)->toDateString(),
-                ];
-            }
+            file_put_contents($full, $file['body']);
         }
-
-        foreach ($staticPages as $article) {
-            $urls[] = [
-                'loc' => $this->localePublicUrl($baseUrl, self::DEFAULT_LOCALE, "{$article->slug}.html"),
-                'priority' => '0.5',
-                'lastmod' => optional($article->updated_at)->toDateString(),
-            ];
-        }
-
-        $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
-        foreach ($urls as $u) {
-            $xml .= "  <url>\n    <loc>" . htmlspecialchars($u['loc']) . "</loc>\n";
-            if (!empty($u['lastmod'])) {
-                $xml .= "    <lastmod>{$u['lastmod']}</lastmod>\n";
-            }
-            $xml .= "    <priority>{$u['priority']}</priority>\n  </url>\n";
-        }
-        $xml .= '</urlset>';
-        file_put_contents("{$outputPath}/sitemap.xml", $xml);
     }
 
     private function renderRobotsTxt(string $outputPath, string $baseUrl): void

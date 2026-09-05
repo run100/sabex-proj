@@ -31,7 +31,7 @@ return [
     'roblox' => [
         'client_id' => env('ROBLOX_CLIENT_ID'),
         'client_secret' => env('ROBLOX_CLIENT_SECRET'),
-        'redirect' => env('ROBLOX_REDIRECT_URI', 'http://trades.sabex.lab/auth/roblox/callback'),
+        'redirect' => env('ROBLOX_REDIRECT_URI', 'http://www.sabex.lab/auth/roblox/callback'),
         'authorize' => 'https://apis.roblox.com/oauth/v1/authorize',
         'token' => 'https://apis.roblox.com/oauth/v1/token',
         'userinfo' => 'https://apis.roblox.com/oauth/v1/userinfo',

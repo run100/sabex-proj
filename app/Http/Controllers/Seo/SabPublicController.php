@@ -116,6 +116,13 @@ class SabPublicController extends Controller
         ]);
     }
 
+    public function sitemapShard(string $name, SabRenderService $sabRender): Response
+    {
+        return response($sabRender->buildLiveSitemapShardXml($name), 200, [
+            'Content-Type' => 'application/xml; charset=UTF-8',
+        ]);
+    }
+
     private function locale(Request $request, ?string $routeLocale = null): string
     {
         return SabRenderService::normalizeLocale($routeLocale ?: (string) $request->query('locale', SabRenderService::defaultLocale()));

@@ -12,11 +12,11 @@ use Illuminate\Http\JsonResponse;
 
 class JoinRequestController extends Controller
 {
-    public function accept(string $public_id, TradeJoinService $joins): JsonResponse
+    public function accept(string $ulid, TradeJoinService $joins): JsonResponse
     {
         abort_unless(TradeSchema::ready(), 404);
         try {
-            $listing = $joins->accept(auth('trades')->user(), $joins->findPublic($public_id));
+            $listing = $joins->accept(auth('trades')->user(), $joins->findPublic($ulid));
 
             return TradeApi::ok(['trade' => TradePresenter::listing($listing)]);
         } catch (TradeException $e) {
@@ -24,11 +24,11 @@ class JoinRequestController extends Controller
         }
     }
 
-    public function reject(string $public_id, TradeJoinService $joins): JsonResponse
+    public function reject(string $ulid, TradeJoinService $joins): JsonResponse
     {
         abort_unless(TradeSchema::ready(), 404);
         try {
-            $row = $joins->reject(auth('trades')->user(), $joins->findPublic($public_id));
+            $row = $joins->reject(auth('trades')->user(), $joins->findPublic($ulid));
 
             return TradeApi::ok(['join_request' => TradePresenter::join($row)]);
         } catch (TradeException $e) {
@@ -36,11 +36,11 @@ class JoinRequestController extends Controller
         }
     }
 
-    public function cancel(string $public_id, TradeJoinService $joins): JsonResponse
+    public function cancel(string $ulid, TradeJoinService $joins): JsonResponse
     {
         abort_unless(TradeSchema::ready(), 404);
         try {
-            $row = $joins->cancel(auth('trades')->user(), $joins->findPublic($public_id));
+            $row = $joins->cancel(auth('trades')->user(), $joins->findPublic($ulid));
 
             return TradeApi::ok(['join_request' => TradePresenter::join($row)]);
         } catch (TradeException $e) {

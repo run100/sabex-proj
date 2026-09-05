@@ -12,7 +12,6 @@ class SabHost
 
         return match ($host) {
             (string) config('sab.hosts.admin') => 'admin',
-            (string) config('sab.hosts.trades') => 'trades',
             default => 'www',
         };
     }
@@ -22,18 +21,20 @@ class SabHost
         return self::role($host) === 'admin';
     }
 
-    public static function isTrades(?string $host = null): bool
-    {
-        return self::role($host) === 'trades';
-    }
-
     public static function host(string $role): string
     {
+        if ($role === 'trades') {
+            $role = 'www';
+        }
+
         return (string) config('sab.hosts.'.$role, '');
     }
 
     public static function origin(string $role, ?Request $request = null): string
     {
+        if ($role === 'trades') {
+            $role = 'www';
+        }
         $request ??= request();
         $host = self::host($role);
         $scheme = $request->getScheme() ?: 'https';
@@ -46,6 +47,11 @@ class SabHost
         return $origin;
     }
 
+    public static function tradesBase(?Request $request = null): string
+    {
+        return rtrim(self::origin('www', $request), '/').'/trading';
+    }
+
     /**
      * @return list<string>
      */
@@ -54,7 +60,7 @@ class SabHost
         return array_values(array_unique(array_filter([
             self::host('www'),
             self::host('admin'),
-            self::host('trades'),
+            'www.sabexistcount.com',
             'localhost',
             '127.0.0.1',
         ])));

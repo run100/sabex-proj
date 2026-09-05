@@ -17,6 +17,8 @@ if ($consolePath !== '') {
 
 Route::get('/robots.txt', [SabPublicController::class, 'robots']);
 Route::get('/sitemap.xml', [SabPublicController::class, 'sitemap']);
+Route::get('/sitemaps/{name}.xml', [SabPublicController::class, 'sitemapShard'])
+    ->where('name', 'main|trading-[1-9][0-9]*|profiles-[1-9][0-9]*');
 
 Route::get('/', [SabPublicController::class, 'home']);
 Route::get('/sab-exist-count-list', [SabPublicController::class, 'existCountsList']);

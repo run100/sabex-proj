@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Trades;
 
 use App\Http\Controllers\Controller;
-use App\Models\TradeUser;
+use App\Models\TradeAuthAccount;
 use App\Services\Trades\RobloxOAuthService;
+use App\Services\Trades\TradeAuthAccountService;
+use App\Support\TradeAuthRedirect;
+use App\Support\TradeCanonical;
+use App\Support\TradePaths;
 use App\Support\TradePresenter;
 use App\Support\TradeSchema;
 use Illuminate\Http\RedirectResponse;
@@ -13,17 +17,14 @@ use Illuminate\View\View;
 
 class RobloxAuthController extends Controller
 {
-    public function show(Request $request, RobloxOAuthService $oauth): View|RedirectResponse
+    public function show(Request $request): View
     {
-        $this->storeReturnTo($request);
-        if ($oauth->configured() && TradeSchema::ready() && $request->query('return_to')) {
-            return $this->redirect($request, $oauth);
-        }
+        TradeAuthRedirect::storeReturnTo($request);
 
         return view('trades.login', TradePresenter::page([
-            'seoTitle' => 'Sign in with Roblox',
-            'seoDescription' => 'Sign in with Roblox to post Steal a Brainrot trades.',
-            'canonical' => url('/auth/roblox'),
+            'seoTitle' => 'Sign in to SAB Trades',
+            'seoDescription' => 'Sign in with official Roblox OAuth to post Steal a Brainrot trades.',
+            'canonical' => TradeCanonical::absolute('/auth/roblox'),
             'robots' => 'noindex,nofollow',
         ]));
     }
@@ -31,7 +32,7 @@ class RobloxAuthController extends Controller
     public function redirect(Request $request, RobloxOAuthService $oauth): RedirectResponse
     {
         abort_unless($oauth->configured(), 404);
-        $this->storeReturnTo($request);
+        TradeAuthRedirect::storeReturnTo($request);
         $auth = $oauth->authorization();
         $request->session()->put('roblox_oauth_state', $auth['state']);
         $request->session()->put('roblox_oauth_verifier', $auth['verifier']);
@@ -40,7 +41,7 @@ class RobloxAuthController extends Controller
         return redirect()->away($auth['url']);
     }
 
-    public function callback(Request $request, RobloxOAuthService $oauth): RedirectResponse
+    public function callback(Request $request, RobloxOAuthService $oauth, TradeAuthAccountService $accounts): RedirectResponse
     {
         abort_unless($oauth->configured() && TradeSchema::ready(), 404);
         abort_unless(hash_equals((string) $request->session()->pull('roblox_oauth_state'), (string) $request->query('state')), 404);
@@ -50,24 +51,15 @@ class RobloxAuthController extends Controller
             (string) $request->session()->pull('roblox_oauth_verifier')
         );
 
-        $user = TradeUser::query()->firstOrNew(['roblox_sub' => $profile['sub']]);
-        $user->username = $profile['username'];
-        $user->display_name = $profile['display_name'];
-        $user->avatar_url = $profile['avatar_url'];
-        $user->profile_url = 'https://www.roblox.com/users/'.$profile['sub'].'/profile';
-        $user->last_login_at = now();
-        if (! $user->exists) {
-            $user->account_status = TradeUser::STATUS_ACTIVE;
-        }
-        $user->save();
+        $user = $accounts->loginOrCreate(TradeAuthAccount::PROVIDER_ROBLOX, $profile['sub'], [
+            'username' => $profile['username'],
+            'display_name' => $profile['display_name'],
+            'avatar_url' => $profile['avatar_url'],
+        ]);
 
         abort_unless($user->isActive(), 404);
 
-        auth('trades')->login($user, true);
-        $request->session()->regenerate();
-        $return = (string) $request->session()->pull('roblox_oauth_return', '/');
-
-        return redirect($this->safeReturn($return));
+        return TradeAuthRedirect::login($request, $user);
     }
 
     public function logout(Request $request): RedirectResponse
@@ -76,23 +68,6 @@ class RobloxAuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/');
-    }
-
-    private function storeReturnTo(Request $request): void
-    {
-        $return = (string) $request->query('return_to', $request->input('return_to', ''));
-        if ($return !== '') {
-            $request->session()->put('roblox_oauth_return', $this->safeReturn($return));
-        }
-    }
-
-    private function safeReturn(string $path): string
-    {
-        if ($path === '' || ! str_starts_with($path, '/') || str_starts_with($path, '//')) {
-            return '/';
-        }
-
-        return $path;
+        return redirect(TradePaths::marketplace());
     }
 }

@@ -16,7 +16,7 @@ class TradeException extends RuntimeException
 
     public static function authRequired(): self
     {
-        return new self('AUTH_REQUIRED', 'Sign in with Roblox to continue.', 401);
+        return new self('AUTH_REQUIRED', 'Sign in to continue.', 401);
     }
 
     public static function banned(): self

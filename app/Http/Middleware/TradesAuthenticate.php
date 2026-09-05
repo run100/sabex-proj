@@ -27,7 +27,7 @@ class TradesAuthenticate
                 return TradeApi::fromException(TradeException::banned());
             }
 
-            return redirect('/')->with('trade_error', 'This account is suspended.');
+            return redirect('/trading')->with('trade_error', 'This account is suspended.');
         }
 
         return $next($request);

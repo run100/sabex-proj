@@ -40,6 +40,7 @@ class TradeListing extends Model
         'value_difference_snapshot',
         'difference_percent_snapshot',
         'note',
+        'posted_ip',
         'views_count',
         'accepted_at',
         'pending_at',
@@ -113,6 +114,11 @@ class TradeListing extends Model
     public function events(): HasMany
     {
         return $this->hasMany(TradeEvent::class, 'listing_id');
+    }
+
+    public function reports(): HasMany
+    {
+        return $this->hasMany(TradeReport::class, 'listing_id');
     }
 
     public function isOpen(): bool

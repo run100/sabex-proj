@@ -13,8 +13,9 @@
 
 <title>{{ $seoTitle }}</title>
 <meta name="description" content="{{ $seoDescription }}" />
-@if(!empty($t['meta_keywords'] ?? ''))
-<meta name="keywords" content="{{ $t['meta_keywords'] }}" />
+@php $keywords = $seoKeywords ?? ($t['meta_keywords'] ?? ''); @endphp
+@if($keywords !== '')
+<meta name="keywords" content="{{ $keywords }}" />
 @endif
 <meta name="robots" content="{{ $robots ?? 'index,follow,max-image-preview:large' }}" />
 <meta name="theme-color" content="#020617" />

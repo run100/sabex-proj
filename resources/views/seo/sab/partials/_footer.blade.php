@@ -4,7 +4,9 @@
       <p>© {{ date('Y') }} {{ $t['footer_copyright_rest'] }}</p>
       <div class="flex flex-wrap gap-4">
         @php
-          $legalHrefPrefix = \Illuminate\Support\Str::startsWith($urlPrefix ?? '', '/seo/sab/preview') ? '/seo/sab/preview' : null;
+          $legalHrefPrefix = \Illuminate\Support\Str::startsWith($urlPrefix ?? '', '/seo/sab/preview')
+            ? '/seo/sab/preview'
+            : (preg_match('#^https?://#', (string) ($urlPrefix ?? '')) ? rtrim((string) $urlPrefix, '/') : null);
           $sabFooterHomeHref = (($urlPrefix ?? '') === '') ? '/' : $urlPrefix;
           $englishPrefix = $productUrlPrefix
             ?? (str_starts_with((string) ($urlPrefix ?? ''), '/seo/sab/preview') ? '/seo/sab/preview' : '');

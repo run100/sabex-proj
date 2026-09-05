@@ -10,7 +10,7 @@
 
 <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
   <div>
-    <h1 class="text-2xl font-black">Trade {{ $listing->public_id }}</h1>
+    <h1 class="text-2xl font-black">{{ $listingH1 ?? ('Trade '.$listing->public_id) }}</h1>
     <p class="text-sm text-slate-400">{{ $listing->status }} · {{ $listing->views_count }} views · {{ optional($listing->created_at)->diffForHumans() }}</p>
   </div>
   <button type="button" data-copy-link class="rounded-full border border-white/15 px-3 py-1 text-sm text-slate-200">Copy trade link</button>
@@ -28,7 +28,7 @@
   <section class="rounded-xl border border-white/10 bg-slate-900/70 p-4">
     <h2 class="mb-3 font-bold">Actions</h2>
     @if($listing->isOpen() && $user && !$isOwner)
-      <form method="post" action="/api/v1/trades/{{ $listing->public_id }}/join" data-json-form>
+      <form method="post" action="/api/v1/trading/trades/{{ $listing->public_id }}/join" data-json-form>
         @csrf
         <label class="block text-sm text-slate-400">Note
           <input name="note" maxlength="280" class="mt-1 w-full rounded border border-white/10 bg-slate-950 px-3 py-2 text-white">
@@ -36,22 +36,22 @@
         <button class="mt-3 rounded-full bg-cyan-700 px-4 py-2 text-sm font-bold text-cyan-50">Join Trade</button>
       </form>
     @elseif($listing->isOpen() && !$user)
-      <a href="/auth/roblox?return_to=/t/{{ $listing->public_id }}" class="inline-flex rounded-full bg-cyan-700 px-4 py-2 text-sm font-bold text-cyan-50">Sign in to join</a>
+      <a href="/auth/roblox?return_to=/trading/{{ $listing->public_id }}" class="inline-flex rounded-full bg-cyan-700 px-4 py-2 text-sm font-bold text-cyan-50">Sign in to join</a>
     @endif
     @if($isOwner && $listing->isOpen())
-      <form method="post" action="/api/v1/trades/{{ $listing->public_id }}/cancel" data-json-form class="mb-4">
+      <form method="post" action="/api/v1/trading/trades/{{ $listing->public_id }}/cancel" data-json-form class="mb-4">
         @csrf
         <button class="rounded-full border border-rose-500/40 px-4 py-2 text-sm font-bold text-rose-200">Cancel listing</button>
       </form>
     @endif
     @if($isParticipant && $listing->isPendingLike())
       <div class="flex flex-wrap gap-2">
-        <form method="post" action="/api/v1/trades/{{ $listing->public_id }}/confirm" data-json-form>
+        <form method="post" action="/api/v1/trading/trades/{{ $listing->public_id }}/confirm" data-json-form>
           @csrf
           <input type="hidden" name="confirmation" value="completed">
           <button class="rounded-full bg-emerald-700 px-4 py-2 text-sm font-bold text-emerald-50">Mark Completed</button>
         </form>
-        <form method="post" action="/api/v1/trades/{{ $listing->public_id }}/confirm" data-json-form>
+        <form method="post" action="/api/v1/trading/trades/{{ $listing->public_id }}/confirm" data-json-form>
           @csrf
           <input type="hidden" name="confirmation" value="failed">
           <button class="rounded-full border border-rose-500/40 px-4 py-2 text-sm font-bold text-rose-200">Mark Failed</button>
@@ -79,14 +79,14 @@
   @forelse($joinRequests as $join)
     <div class="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-3">
       <div>
-        <a class="text-cyan-300" href="/u/{{ $join->requester?->roblox_sub }}">{{ $join->requester?->display_name ?: $join->requester?->username }}</a>
+        <a class="text-cyan-300" href="{{ $join->requester?->profilePath() ?? '#' }}">{{ $join->requester?->display_name ?: $join->requester?->username }}</a>
         <span class="text-slate-500 text-sm">{{ $join->status }}</span>
         @if($join->note)<p class="text-sm text-slate-400">{{ $join->note }}</p>@endif
       </div>
       @if($join->isActive())
         <div class="flex gap-2">
-          <form method="post" action="/api/v1/join-requests/{{ $join->public_id }}/accept" data-json-form>@csrf<button class="rounded-full bg-cyan-700 px-3 py-1 text-sm font-bold text-cyan-50">Accept</button></form>
-          <form method="post" action="/api/v1/join-requests/{{ $join->public_id }}/reject" data-json-form>@csrf<button class="rounded-full border border-white/15 px-3 py-1 text-sm">Reject</button></form>
+          <form method="post" action="/api/v1/trading/join-requests/{{ $join->public_id }}/accept" data-json-form>@csrf<button class="rounded-full bg-cyan-700 px-3 py-1 text-sm font-bold text-cyan-50">Accept</button></form>
+          <form method="post" action="/api/v1/trading/join-requests/{{ $join->public_id }}/reject" data-json-form>@csrf<button class="rounded-full border border-white/15 px-3 py-1 text-sm">Reject</button></form>
         </div>
       @endif
     </div>

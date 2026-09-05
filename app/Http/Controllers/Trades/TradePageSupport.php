@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Trades;
 
+use App\Support\TradeCanonical;
 use App\Support\TradePresenter;
 use App\Support\TradeSchema;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Http\Request;
 
 trait TradePageSupport
 {
@@ -19,5 +22,10 @@ trait TradePageSupport
     protected function requireSchema(): void
     {
         abort_unless(TradeSchema::ready(), 404);
+    }
+
+    protected function assertListPage(Request $request, LengthAwarePaginator $page): void
+    {
+        TradeCanonical::abortInvalidPage($request, $page);
     }
 }

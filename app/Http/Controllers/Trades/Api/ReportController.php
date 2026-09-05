@@ -18,7 +18,7 @@ class ReportController extends Controller
         abort_unless(TradeSchema::ready(), 404);
         $data = $request->validate([
             'listing_public_id' => ['nullable', 'string'],
-            'roblox_sub' => ['nullable', 'string'],
+            'profile_id' => ['nullable', 'string', 'size:26'],
             'reason' => ['required', 'in:spam,fake_trade,scam,abuse,inappropriate,duplicate,other'],
             'description' => ['nullable', 'string', 'max:1000'],
         ]);

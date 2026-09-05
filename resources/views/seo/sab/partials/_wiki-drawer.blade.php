@@ -31,6 +31,12 @@
       'grid' => '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
       'cycle' => '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>',
       'clock' => '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+      'post' => '<path d="M12 5v14M5 12h14"/>',
+      'bell' => '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 7 3 7H3s3 0 3-7"/><path d="M10 18a2 2 0 0 0 4 0"/>',
+      'user' => '<circle cx="12" cy="8" r="3"/><path d="M5 19a7 7 0 0 1 14 0"/>',
+      'login' => '<path d="M15 3h4v18h-4"/><path d="M10 17 15 12 10 7"/><path d="M15 12H3"/>',
+      'logout' => '<path d="M9 21H5V3h4"/><path d="M16 17 21 12 16 7"/><path d="M21 12H9"/>',
+      'settings' => '<circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M3 12h2M19 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
     ];
 
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'.($paths[$name] ?? '').'</svg>';
@@ -77,6 +83,22 @@
       </button>
     </div>
     <nav class="sab-wiki-drawer__nav" aria-label="Menu">
+      @if(!empty($tradesDrawerItems))
+      <p class="sab-wiki-drawer__group">Trades</p>
+      @foreach($tradesDrawerItems as $item)
+        @if(($item['method'] ?? 'get') === 'post')
+        <form method="post" action="{{ $item['href'] }}" class="sab-wiki-drawer__form">
+          @csrf
+          <button type="submit" class="sab-wiki-drawer__link">
+            <span class="sab-wiki-drawer__icon">{!! $wikiDrawerIcon($item['icon'] ?? '') !!}</span>
+            <span>{{ $item['label'] }}</span>
+          </button>
+        </form>
+        @else
+        <a href="{{ $item['href'] }}" class="sab-wiki-drawer__link{{ !empty($item['active']) ? ' is-active' : '' }}"><span class="sab-wiki-drawer__icon">{!! $wikiDrawerIcon($item['icon'] ?? '') !!}</span><span>{{ $item['label'] }}</span></a>
+        @endif
+      @endforeach
+      @endif
       <p class="sab-wiki-drawer__group">Tools</p>
       @foreach($wikiDrawerToolItems as $item)
       <a href="{{ $item['href'] }}" class="sab-wiki-drawer__link{{ $item['active'] ? ' is-active' : '' }}"><span class="sab-wiki-drawer__icon">{!! $wikiDrawerIcon($item['icon']) !!}</span><span>{{ $item['label'] }}</span></a>
@@ -176,6 +198,17 @@
   }
   .sab-wiki-drawer__group:first-child {
     margin-top: .15rem;
+  }
+  .sab-wiki-drawer__form {
+    margin: 0;
+  }
+  .sab-wiki-drawer__form .sab-wiki-drawer__link {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
   }
   .sab-wiki-drawer__link {
     display: flex;

@@ -6,8 +6,10 @@ use App\Exceptions\TradeException;
 use App\Http\Controllers\Controller;
 use App\Services\Trades\TradeJoinService;
 use App\Services\Trades\TradeListingService;
-use App\Support\SabHost;
+use App\Support\TradeCanonical;
+use App\Support\TradePaths;
 use App\Support\TradePresenter;
+use App\Support\TradeSeo;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -15,11 +17,11 @@ class TradeShowController extends Controller
 {
     use TradePageSupport;
 
-    public function __invoke(Request $request, string $public_id, TradeListingService $listings, TradeJoinService $joins): View
+    public function __invoke(Request $request, string $ulid, TradeListingService $listings, TradeJoinService $joins): View
     {
         $this->requireSchema();
         try {
-            $listing = $listings->findPublic($public_id);
+            $listing = $listings->findPublic($ulid);
         } catch (TradeException) {
             abort(404);
         }
@@ -35,13 +37,15 @@ class TradeShowController extends Controller
         if ($user && (int) $user->id === (int) $listing->owner_user_id) {
             $joinRequests = $joins->forListing($user, $listing);
         }
+        $seo = TradeSeo::listing($listing);
 
         return view('trades.show', $this->page([
-            'seoTitle' => 'Trade '.$listing->public_id,
-            'seoDescription' => 'Steal a Brainrot trade listing. Community reference only — finish the swap in Roblox.',
-            'canonical' => SabHost::origin('trades').'/t/'.$listing->public_id,
-            'robots' => 'noindex,follow',
+            'seoTitle' => $seo['title'],
+            'seoDescription' => $seo['description'],
+            'canonical' => TradeCanonical::absolute(TradePaths::show($listing->public_id)),
+            'robots' => 'index,follow',
             'listing' => $listing,
+            'listingH1' => $seo['h1'],
             'card' => TradePresenter::listing($listing, true),
             'joinRequests' => $joinRequests,
         ]));

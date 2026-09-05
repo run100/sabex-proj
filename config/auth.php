@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\SeoUser;
 use App\Models\TradeUser;
 use App\Models\User;
 
@@ -43,6 +44,10 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        'admin' => [
+            'driver' => 'session',
+            'provider' => 'seo_users',
+        ],
         'trades' => [
             'driver' => 'session',
             'provider' => 'trade_users',
@@ -74,6 +79,10 @@ return [
         'trade_users' => [
             'driver' => 'eloquent',
             'model' => TradeUser::class,
+        ],
+        'seo_users' => [
+            'driver' => 'eloquent',
+            'model' => SeoUser::class,
         ],
 
         // 'users' => [

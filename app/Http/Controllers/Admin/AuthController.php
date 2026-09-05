@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Support\AccessLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,18 +23,26 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        if (! Auth::guard('web')->attempt($credentials, true)) {
+        if (! Auth::guard('admin')->attempt($credentials, true)) {
             abort(404);
         }
 
         $request->session()->regenerate();
+        $admin = Auth::guard('admin')->user();
+        if ($admin) {
+            $ip = AccessLogService::ip($request);
+            $admin->last_login_at = now();
+            AccessLogService::assign($admin, 'last_login_ip', $ip);
+            $admin->save();
+            AccessLogService::write('admin', (int) $admin->id, 'login', $ip, 'seo_user', (int) $admin->id, $request);
+        }
 
         return redirect('/items');
     }
 
     public function logout(Request $request): RedirectResponse
     {
-        Auth::guard('web')->logout();
+        Auth::guard('admin')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 

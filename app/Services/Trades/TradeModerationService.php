@@ -32,8 +32,8 @@ class TradeModerationService
             $listing = $this->listings->findPublic((string) $data['listing_public_id']);
         }
         $reported = null;
-        if (! empty($data['roblox_sub'])) {
-            $reported = TradeUser::query()->where('roblox_sub', $data['roblox_sub'])->first();
+        if (! empty($data['profile_id'])) {
+            $reported = TradeUser::findPublic((string) $data['profile_id']);
         } elseif ($listing) {
             $reported = $listing->owner;
         }

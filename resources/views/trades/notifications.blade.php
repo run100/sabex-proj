@@ -12,7 +12,7 @@
       <p class="text-sm text-slate-400">{{ $row->message }}</p>
       <p class="mt-1 text-xs text-slate-500">{{ optional($row->created_at)->diffForHumans() }}</p>
       @if($row->listing)
-        <a class="text-sm text-cyan-300" href="/t/{{ $row->listing->public_id }}">View trade</a>
+        <a class="text-sm text-cyan-300" href="/trading/{{ $row->listing->public_id }}">View trade</a>
       @endif
     </article>
   @empty

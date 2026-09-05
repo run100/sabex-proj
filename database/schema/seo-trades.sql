@@ -1,8 +1,9 @@
 -- Review only. Do not run until confirmed.
 -- SABExistCount Trades (PRD v1.0, adapted to this repo).
 -- Does not touch seo_items / seo_item_variants / price JSON.
--- Skips seo_trade_sessions, seo_trade_oauth_states, seo_trade_auth_accounts
+-- Skips seo_trade_sessions and seo_trade_oauth_states
 -- (Laravel session + PKCE in session; tokens are not stored).
+-- Login identities live in seo_trade_auth_accounts (email / roblox / google / local).
 --
 -- Adaptations vs PRD:
 --   roblox_user_id BIGINT -> roblox_sub VARCHAR(64)
@@ -13,21 +14,67 @@
 CREATE TABLE IF NOT EXISTS `seo_trade_users` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `public_id` CHAR(26) NOT NULL,
-  `roblox_sub` VARCHAR(64) NOT NULL,
+  `profile_id` CHAR(26) NOT NULL,
+  `roblox_sub` VARCHAR(64) DEFAULT NULL,
+  `roblox_user_id` BIGINT UNSIGNED DEFAULT NULL,
   `username` VARCHAR(100) NOT NULL,
   `display_name` VARCHAR(100) DEFAULT NULL,
   `avatar_url` VARCHAR(500) DEFAULT NULL,
   `profile_url` VARCHAR(500) DEFAULT NULL,
+  `email` VARCHAR(255) DEFAULT NULL,
+  `email_verified_at` DATETIME DEFAULT NULL,
   `account_status` ENUM('active', 'suspended', 'banned', 'deleted') NOT NULL DEFAULT 'active',
+  `profile_visibility` ENUM('public', 'unlisted', 'private') NOT NULL DEFAULT 'public',
+  `moderation_status` ENUM('clear', 'review', 'restricted') NOT NULL DEFAULT 'clear',
+  `profile_index_eligible` TINYINT(1) NOT NULL DEFAULT 0,
+  `deleted_at` DATETIME DEFAULT NULL,
+  `posting_approved` TINYINT(1) NOT NULL DEFAULT 1,
+  `posting_approved_at` DATETIME DEFAULT NULL,
+  `password` VARCHAR(255) DEFAULT NULL,
   `remember_token` VARCHAR(100) DEFAULT NULL,
   `last_login_at` DATETIME DEFAULT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_trade_users_public_id` (`public_id`),
+  UNIQUE KEY `uk_trade_users_profile_id` (`profile_id`),
   UNIQUE KEY `uk_trade_users_roblox_sub` (`roblox_sub`),
+  UNIQUE KEY `uk_trade_users_roblox_user_id` (`roblox_user_id`),
+  UNIQUE KEY `uk_trade_users_email` (`email`),
   KEY `idx_trade_users_username` (`username`),
   KEY `idx_trade_users_status` (`account_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `seo_trade_auth_accounts` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `provider` ENUM('email', 'roblox', 'google', 'local') NOT NULL,
+  `provider_uid` VARCHAR(255) NOT NULL,
+  `provider_username` VARCHAR(100) DEFAULT NULL,
+  `avatar_url` VARCHAR(500) DEFAULT NULL,
+  `bound_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_login_at` DATETIME DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_auth_provider_uid` (`provider`, `provider_uid`),
+  UNIQUE KEY `uk_auth_user_provider` (`user_id`, `provider`),
+  KEY `idx_auth_user_id` (`user_id`),
+  CONSTRAINT `fk_auth_account_user`
+    FOREIGN KEY (`user_id`) REFERENCES `seo_trade_users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `seo_trade_email_codes` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `email` VARCHAR(255) NOT NULL,
+  `code` CHAR(6) NOT NULL,
+  `purpose` ENUM('login','bind') NOT NULL DEFAULT 'login',
+  `attempts` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `expires_at` DATETIME NOT NULL,
+  `used_at` DATETIME DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_email_codes_lookup` (`email`, `purpose`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `seo_trade_listings` (

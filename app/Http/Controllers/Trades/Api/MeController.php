@@ -16,7 +16,7 @@ class MeController extends Controller
         $user = auth('trades')->user();
 
         return TradeApi::ok([
-            'user' => TradePresenter::user($user),
+            'user' => TradePresenter::userPrivate($user),
             'unread_count' => $notifications->unreadCount($user),
         ]);
     }

@@ -12,4 +12,6 @@ return [
         'trim',
         explode(',', (string) env('TRADE_MODERATOR_ROBLOX_SUBS', ''))
     ))),
+    'allow_email_login' => filter_var(env('ALLOW_EMAIL_LOGIN', false), FILTER_VALIDATE_BOOL),
+    'allow_email_bind' => filter_var(env('ALLOW_EMAIL_BIND', false), FILTER_VALIDATE_BOOL),
 ];
