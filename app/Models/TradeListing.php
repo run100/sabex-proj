@@ -27,6 +27,10 @@ class TradeListing extends Model
 
     public const STATUS_HIDDEN = 'hidden';
 
+    public const FLAG_YES = 'Y';
+
+    public const FLAG_NO = 'N';
+
     protected $table = 'seo_trade_listings';
 
     protected $fillable = [
@@ -42,6 +46,9 @@ class TradeListing extends Model
         'note',
         'posted_ip',
         'views_count',
+        'sort_order',
+        'is_hot',
+        'is_top',
         'accepted_at',
         'pending_at',
         'completed_at',
@@ -58,6 +65,7 @@ class TradeListing extends Model
             'value_difference_snapshot' => 'float',
             'difference_percent_snapshot' => 'float',
             'views_count' => 'integer',
+            'sort_order' => 'integer',
             'accepted_at' => 'datetime',
             'pending_at' => 'datetime',
             'completed_at' => 'datetime',
@@ -66,6 +74,12 @@ class TradeListing extends Model
             'expires_at' => 'datetime',
         ];
     }
+
+    protected $attributes = [
+        'sort_order' => 0,
+        'is_hot' => self::FLAG_NO,
+        'is_top' => self::FLAG_NO,
+    ];
 
     protected static function booted(): void
     {

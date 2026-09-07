@@ -46,6 +46,10 @@ class TradeShowController extends Controller
             'robots' => 'index,follow',
             'listing' => $listing,
             'listingH1' => $seo['h1'],
+            'h1Offering' => $seo['h1Offering'],
+            'h1Looking' => $seo['h1Looking'],
+            'offeringMore' => $seo['offeringMore'],
+            'lookingMore' => $seo['lookingMore'],
             'card' => TradePresenter::listing($listing, true),
             'joinRequests' => $joinRequests,
         ]));

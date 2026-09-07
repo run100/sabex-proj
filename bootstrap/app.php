@@ -3,6 +3,9 @@
 use App\Http\Middleware\AdminAllowIp;
 use App\Http\Middleware\AdminAuthenticate;
 use App\Http\Middleware\AdminNoIndex;
+use App\Http\Middleware\CachePublicSeo;
+use App\Http\Middleware\FinalizeCachedSeo;
+use App\Http\Middleware\PrivateNoStore;
 use App\Http\Middleware\RedirectWwwToApex;
 use App\Http\Middleware\TradesAuthenticate;
 use App\Support\SabHost;
@@ -31,14 +34,17 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustHosts(at: fn () => SabHost::trustedHosts());
+        $middleware->prepend(RedirectWwwToApex::class);
         $middleware->web(prepend: [
-            RedirectWwwToApex::class,
+            FinalizeCachedSeo::class,
         ]);
         $middleware->alias([
             'admin.ip' => AdminAllowIp::class,
             'admin.auth' => AdminAuthenticate::class,
             'admin.noindex' => AdminNoIndex::class,
             'trades.auth' => TradesAuthenticate::class,
+            'cache.public.seo' => CachePublicSeo::class,
+            'cache.private' => PrivateNoStore::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

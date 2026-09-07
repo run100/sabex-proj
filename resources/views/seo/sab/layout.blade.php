@@ -9,6 +9,7 @@
 <main class="max-w-7xl mx-auto px-3 pt-4 pb-8 sm:px-4">
   @yield('content')
 </main>
+@include('seo.sab.partials._bottom-nav')
 @include('seo.sab.partials._footer')
 <button class="sab-back-to-top" type="button" aria-label="Back to top" data-sab-back-to-top>
   <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
@@ -16,6 +17,7 @@
   </svg>
 </button>
 @yield('scripts')
+<script src="/static/js/sab-nav-auth.js" defer></script>
 <script>
   (function () {
     var button = document.querySelector('[data-sab-back-to-top]');

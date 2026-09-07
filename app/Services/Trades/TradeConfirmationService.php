@@ -37,6 +37,15 @@ class TradeConfirmationService
                 throw TradeException::conflict('TRADE_ALREADY_COMPLETED', 'This trade is not waiting for confirmation.');
             }
 
+            $existing = TradeConfirmation::query()
+                ->where('listing_id', $locked->id)
+                ->where('user_id', $user->id)
+                ->lockForUpdate()
+                ->first();
+            if ($existing && $existing->confirmation === $confirmation) {
+                return $locked->fresh(['owner', 'counterparty', 'items.traits', 'confirmations']) ?? $locked;
+            }
+
             TradeConfirmation::query()->updateOrCreate(
                 ['listing_id' => $locked->id, 'user_id' => $user->id],
                 ['confirmation' => $confirmation, 'note' => $note]

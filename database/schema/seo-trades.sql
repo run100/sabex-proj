@@ -100,6 +100,9 @@ CREATE TABLE IF NOT EXISTS `seo_trade_listings` (
   `difference_percent_snapshot` DECIMAL(12,4) DEFAULT NULL,
   `note` VARCHAR(280) DEFAULT NULL,
   `views_count` INT UNSIGNED NOT NULL DEFAULT 0,
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `is_hot` ENUM('Y', 'N') NOT NULL DEFAULT 'N',
+  `is_top` ENUM('Y', 'N') NOT NULL DEFAULT 'N',
   `accepted_at` DATETIME DEFAULT NULL,
   `pending_at` DATETIME DEFAULT NULL,
   `completed_at` DATETIME DEFAULT NULL,
@@ -114,6 +117,7 @@ CREATE TABLE IF NOT EXISTS `seo_trade_listings` (
   KEY `idx_trade_listings_counterparty_status` (`counterparty_user_id`, `status`),
   KEY `idx_trade_listings_status_created` (`status`, `created_at`),
   KEY `idx_trade_listings_completed_at` (`completed_at`),
+  KEY `idx_trade_listings_pin` (`is_top`, `is_hot`, `sort_order`),
   CONSTRAINT `fk_trade_listing_owner`
     FOREIGN KEY (`owner_user_id`) REFERENCES `seo_trade_users` (`id`),
   CONSTRAINT `fk_trade_listing_counterparty`

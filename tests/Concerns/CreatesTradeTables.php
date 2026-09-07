@@ -96,6 +96,9 @@ trait CreatesTradeTables
             $table->string('note', 280)->nullable();
             $table->string('posted_ip', 45)->nullable();
             $table->unsignedInteger('views_count')->default(0);
+            $table->integer('sort_order')->default(0);
+            $table->string('is_hot', 1)->default('N');
+            $table->string('is_top', 1)->default('N');
             $table->timestamp('accepted_at')->nullable();
             $table->timestamp('pending_at')->nullable();
             $table->timestamp('completed_at')->nullable();

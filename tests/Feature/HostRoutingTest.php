@@ -59,17 +59,22 @@ class HostRoutingTest extends TestCase
         $this->actingAs($admin, 'admin')
             ->get('http://x.sabex.lab/users')
             ->assertOk()
-            ->assertSee('SAB Console');
+            ->assertSee('Admin-SAB');
 
         $this->actingAs($admin, 'admin')
             ->get('http://x.sabex.lab/listings')
             ->assertOk()
-            ->assertSee('SAB Console');
+            ->assertSee('Admin-SAB');
 
         $this->actingAs($admin, 'admin')
             ->get('http://x.sabex.lab/logs')
             ->assertOk()
-            ->assertSee('SAB Console');
+            ->assertSee('Admin-SAB');
+
+        $this->actingAs($admin, 'admin')
+            ->get('http://x.sabex.lab/sites')
+            ->assertOk()
+            ->assertSee('Admin-SAB');
     }
 
     public function test_admin_login_and_item_toggle(): void
@@ -134,7 +139,7 @@ class HostRoutingTest extends TestCase
             ->assertSee('<title>SABExistCount - Steal a Brainrot Trades, Trade Calculator &amp; Values</title>', false)
             ->assertSee('<h1>Steal a Brainrot Trades</h1>', false)
             ->assertSee('Find live Steal a Brainrot trades, post or join offers', false)
-            ->assertSee('Find recent Steal a Brainrot trades from Roblox players', false)
+            ->assertSee('Browse live Steal a Brainrot trades, compare SAB values', false)
             ->assertSee('<h2 class="trades-home-list-title">Recent Steal a Brainrot Trades</h2>', false)
             ->assertDontSee('Steal a Brainrot Trade Calculator &amp; Value List | SABExistCount', false)
             ->assertDontSee('<h1>Steal a Brainrot Trade Calculator</h1>', false)
@@ -144,8 +149,18 @@ class HostRoutingTest extends TestCase
             ->assertSee('Brainrot I want to get')
             ->assertSee('Brainrot I have to give')
             ->assertSee('Post a Trade')
-            ->assertSee('See Activity')
-            ->assertSee('Completed Trades');
+            ->assertSee('Offers')
+            ->assertSee('Value Calculator')
+            ->assertSee('Value List')
+            ->assertSee('href="/user/offers"', false)
+            ->assertSee('href="/steal-a-brainrot-trading-calculator"', false)
+            ->assertSee('href="/sab-value-list"', false)
+            ->assertDontSee('See Activity')
+            ->assertSee('How do I send an offer?')
+            ->assertSee('Make Offer')
+            ->assertSee('Mark Completed')
+            ->assertSee('FAQPage', false)
+            ->assertDontSee('Open Post a Trade');
 
         $this->get('http://www.sabex.lab/robots.txt')
             ->assertOk()

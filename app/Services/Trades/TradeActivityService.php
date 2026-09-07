@@ -2,6 +2,7 @@
 
 namespace App\Services\Trades;
 
+use App\Models\TradeJoinRequest;
 use App\Models\TradeListing;
 use App\Models\TradeUser;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -12,42 +13,72 @@ class TradeActivityService
     /**
      * @return LengthAwarePaginator<int, TradeListing>
      */
-    public function forUser(TradeUser $user, string $status = 'all', int $page = 1, int $limit = 20): LengthAwarePaginator
+    public function forUser(TradeUser $user, string $status = 'received', int $page = 1, int $limit = 20): LengthAwarePaginator
     {
-        $query = $this->forUserQuery($user)->with(['owner', 'counterparty', 'items.traits']);
-
-        $pending = [TradeListing::STATUS_PENDING, TradeListing::STATUS_PENDING_CONFIRMATION];
-        $query = match ($status) {
-            'open' => $query->where('status', TradeListing::STATUS_OPEN),
-            'pending' => $query->whereIn('status', $pending),
-            'completed' => $query->where('status', TradeListing::STATUS_COMPLETED),
-            'failed' => $query->where('status', TradeListing::STATUS_FAILED),
-            'disputed' => $query->where('status', TradeListing::STATUS_DISPUTED),
-            default => $query->whereNotIn('status', [TradeListing::STATUS_HIDDEN]),
-        };
+        $query = $this->scopedQuery($user, $status)->with(['owner', 'counterparty', 'items.traits']);
 
         return $query->orderByDesc('created_at')->orderByDesc('id')
             ->paginate(max(1, min($limit, 50)), ['*'], 'page', $page);
     }
 
     /**
-     * @return array{all: int, pending: int, completed: int, failed: int}
+     * @return array{ads: int, received: int, sent: int, pending: int, completed: int, expired: int}
      */
     public function countsForUser(TradeUser $user): array
     {
-        $rows = $this->forUserQuery($user)
-            ->whereNotIn('status', [TradeListing::STATUS_HIDDEN])
-            ->selectRaw('status, COUNT(*) as aggregate')
-            ->groupBy('status')
-            ->pluck('aggregate', 'status');
-
         return [
-            'all' => (int) $rows->sum(),
-            'pending' => (int) $rows->get(TradeListing::STATUS_PENDING, 0)
-                + (int) $rows->get(TradeListing::STATUS_PENDING_CONFIRMATION, 0),
-            'completed' => (int) $rows->get(TradeListing::STATUS_COMPLETED, 0),
-            'failed' => (int) $rows->get(TradeListing::STATUS_FAILED, 0),
+            'ads' => $this->scopedQuery($user, 'ads')->count(),
+            'received' => $this->scopedQuery($user, 'received')->count(),
+            'sent' => $this->scopedQuery($user, 'sent')->count(),
+            'pending' => $this->scopedQuery($user, 'pending')->count(),
+            'completed' => $this->scopedQuery($user, 'completed')->count(),
+            'expired' => $this->scopedQuery($user, 'expired')->count(),
         ];
+    }
+
+    /**
+     * @return Builder<TradeListing>
+     */
+    private function scopedQuery(TradeUser $user, string $status): Builder
+    {
+        $pending = [TradeListing::STATUS_PENDING, TradeListing::STATUS_PENDING_CONFIRMATION];
+
+        return match ($status) {
+            'ads' => TradeListing::query()
+                ->where('owner_user_id', $user->id)
+                ->whereNotIn('status', [TradeListing::STATUS_HIDDEN]),
+            'sent' => TradeListing::query()
+                ->where('owner_user_id', '!=', $user->id)
+                ->whereHas('joinRequests', function (Builder $q) use ($user): void {
+                    $q->where('requester_user_id', $user->id)
+                        ->where('status', TradeJoinRequest::STATUS_REQUESTED);
+                }),
+            'expired' => TradeListing::query()
+                ->where('status', TradeListing::STATUS_EXPIRED)
+                ->where(function (Builder $q) use ($user): void {
+                    $q->where('owner_user_id', $user->id)
+                        ->orWhere('counterparty_user_id', $user->id)
+                        ->orWhereHas('joinRequests', function (Builder $join) use ($user): void {
+                            $join->where('requester_user_id', $user->id);
+                        });
+                }),
+            'received' => TradeListing::query()
+                ->where('owner_user_id', $user->id)
+                ->whereHas('joinRequests', function (Builder $q): void {
+                    $q->where('status', TradeJoinRequest::STATUS_REQUESTED);
+                }),
+            'open' => $this->forUserQuery($user)->where('status', TradeListing::STATUS_OPEN),
+            'pending' => $this->forUserQuery($user)->whereIn('status', $pending),
+            'completed' => $this->forUserQuery($user)->where('status', TradeListing::STATUS_COMPLETED),
+            'failed' => $this->forUserQuery($user)->where('status', TradeListing::STATUS_FAILED),
+            'disputed' => $this->forUserQuery($user)->where('status', TradeListing::STATUS_DISPUTED),
+            'all' => $this->forUserQuery($user)->whereNotIn('status', [TradeListing::STATUS_HIDDEN]),
+            default => TradeListing::query()
+                ->where('owner_user_id', $user->id)
+                ->whereHas('joinRequests', function (Builder $q): void {
+                    $q->where('status', TradeJoinRequest::STATUS_REQUESTED);
+                }),
+        };
     }
 
     /**

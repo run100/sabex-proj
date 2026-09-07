@@ -8,19 +8,23 @@
 @endphp
 <section class="trades-home-hero">
   <h1>Steal a Brainrot Trades</h1>
-  <p class="trades-home-hero__lead">Find recent Steal a Brainrot trades from Roblox players. Search by the Brainrot you want or have, compare current SAB values, and post or join an offer.</p>
+  <p class="trades-home-hero__lead">Browse live Steal a Brainrot trades, compare SAB values, and find players looking for the items you have.</p>
   <div class="trades-home-actions">
-    <a href="/trading/new" class="trades-btn">
+    <a href="{{ \App\Support\TradePaths::create() }}" class="trades-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
       Post a Trade
     </a>
-    <a href="/user/activity" class="trades-btn trades-btn-ghost">
+    <a href="{{ \App\Support\TradePaths::offers() }}" class="trades-btn trades-btn-ghost">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h3l2-6 4 12 2-6h7"/></svg>
-      See Activity
+      Offers
     </a>
-    <a href="/trading/completed" class="trades-btn trades-btn-ghost">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5 10.5 15 16 9"/></svg>
-      Completed Trades
+    <a href="/{{ \App\Services\Seo\SabRenderService::PAGE_TRADING_CALCULATOR }}" class="trades-btn trades-btn-ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></svg>
+      Value Calculator
+    </a>
+    <a href="/{{ \App\Services\Seo\SabRenderService::PAGE_VALUE_LIST }}" class="trades-btn trades-btn-ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>
+      Value List
     </a>
   </div>
   <p class="trades-home-note">Community listings only. SAB Exist Count is not official Roblox, does not hold items, and does not complete trades. Finish exchanges in Roblox.</p>
@@ -34,7 +38,7 @@
     <svg class="trades-filter__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
   </summary>
   <div class="trades-filter__grid">
-    <div class="trades-filter__field" data-filter-field>
+    <div class="trades-filter__field{{ !empty($haveBrainrot) ? ' is-active' : '' }}" data-filter-field>
       <label class="trades-filter__label" for="trades-filter-have">Brainrot I want to get</label>
       <p class="trades-filter__hint">Find trades offering this</p>
       <input type="hidden" name="have_brainrot_id" value="{{ $haveBrainrot['id'] ?? '' }}">
@@ -45,7 +49,7 @@
       </div>
       <ul class="trades-filter__results" hidden data-filter-results></ul>
     </div>
-    <div class="trades-filter__field" data-filter-field>
+    <div class="trades-filter__field{{ !empty($wantBrainrot) ? ' is-active' : '' }}" data-filter-field>
       <label class="trades-filter__label" for="trades-filter-want">Brainrot I have to give</label>
       <p class="trades-filter__hint">Find who wants this</p>
       <input type="hidden" name="want_brainrot_id" value="{{ $wantBrainrot['id'] ?? '' }}">
@@ -70,7 +74,11 @@
 <h2 class="trades-home-list-title">Recent Steal a Brainrot Trades</h2>
 
 @if(!$schemaMissing && ($listings ?? collect())->isEmpty())
-<p class="text-slate-500">No open listings yet. Post the first one.</p>
+<div class="trades-empty">
+  <p class="trades-empty__title">No matching trades yet.</p>
+  <p class="trades-empty__copy">Try changing your filters or post the trade you're looking for.</p>
+  <a class="trades-btn" href="{{ \App\Support\TradePaths::create() }}">Post a Trade</a>
+</div>
 @endif
 
 <div class="trades-listing-grid">
@@ -87,13 +95,17 @@
   <h2 class="text-xl font-black">About Steal a Brainrot trades</h2>
   <p class="mt-2 text-sm text-slate-400">SABExistCount lists live Steal a Brainrot trade ads so you can compare SAB values, mutations, traits and exist counts before you finish a swap in Roblox. Listings are community posts, not escrow.</p>
 </section>
-<section class="trades-home-faq mt-8 max-w-3xl">
+@php
+  $tradeFaqs = \App\Support\TradeSeo::marketplaceFaqs();
+@endphp
+<section id="faq" class="trades-home-faq mt-8 max-w-3xl">
   <h2 class="text-xl font-black">Trade FAQ</h2>
-  <h3 class="mt-4 text-base font-bold">How do I post a trade?</h3>
-  <p class="mt-1 text-sm text-slate-400">Open Post a Trade, add the Brainrots you have and want, then publish. Guests can build the ad first and sign in with Roblox when they publish.</p>
-  <h3 class="mt-4 text-base font-bold">Does SABExistCount complete the trade?</h3>
-  <p class="mt-1 text-sm text-slate-400">No. Confirm the swap in Roblox, then both players mark the listing completed here.</p>
+  @foreach($tradeFaqs as $faq)
+    <h3 class="mt-4 text-base font-bold">{{ $faq['q'] }}</h3>
+    <p class="mt-1 text-sm text-slate-400">{{ $faq['a'] }}</p>
+  @endforeach
 </section>
+<script type="application/ld+json">{!! \App\Support\TradeSeo::marketplaceFaqJsonLd() !!}</script>
 @endsection
 
 @section('scripts')

@@ -15,6 +15,7 @@ use App\Support\TradeSchema;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class TradeListingService
 {
@@ -208,7 +209,7 @@ class TradeListingService
     public function findPublic(string $publicId): TradeListing
     {
         $listing = TradeListing::query()
-            ->with(['owner', 'counterparty', 'items.traits', 'events.actor', 'joinRequests.requester'])
+            ->with(['owner', 'counterparty', 'items.traits', 'items.seoItem', 'events.actor', 'joinRequests.requester', 'confirmations'])
             ->where('public_id', $publicId)
             ->first();
         if ($listing === null || $listing->status === TradeListing::STATUS_HIDDEN) {
@@ -227,7 +228,6 @@ class TradeListingService
     public function recordView(TradeListing $listing): void
     {
         $listing->increment('views_count');
-        $this->event($listing, 'trade_viewed');
     }
 
     public function expireDue(): int
@@ -360,11 +360,25 @@ class TradeListingService
             $query->whereHas('items', fn (Builder $q) => $q->where('seo_item_id', $id));
         }
 
+        $query = $this->applyPinSort($query);
+
         return match ((string) ($filters['sort'] ?? 'newest')) {
             'value_desc' => $query->orderByDesc('looking_value_snapshot')->orderByDesc('id'),
             'value_asc' => $query->orderBy('looking_value_snapshot')->orderByDesc('id'),
             default => $query->orderByDesc('created_at')->orderByDesc('id'),
         };
+    }
+
+    private function applyPinSort(Builder $query): Builder
+    {
+        if (! Schema::hasColumn('seo_trade_listings', 'is_top')) {
+            return $query;
+        }
+
+        return $query
+            ->orderByRaw("CASE WHEN is_top = 'Y' THEN 1 ELSE 0 END DESC")
+            ->orderByRaw("CASE WHEN is_hot = 'Y' THEN 1 ELSE 0 END DESC")
+            ->orderByDesc('sort_order');
     }
 
     private function assertPostLimits(TradeUser $user): void

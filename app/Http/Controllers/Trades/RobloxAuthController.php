@@ -17,9 +17,12 @@ use Illuminate\View\View;
 
 class RobloxAuthController extends Controller
 {
-    public function show(Request $request): View
+    public function show(Request $request, RobloxOAuthService $oauth): View|RedirectResponse
     {
         TradeAuthRedirect::storeReturnTo($request);
+        if ($request->boolean('start') && $oauth->configured()) {
+            return $this->redirect($request, $oauth);
+        }
 
         return view('trades.login', TradePresenter::page([
             'seoTitle' => 'Sign in to SAB Trades',
@@ -31,7 +34,10 @@ class RobloxAuthController extends Controller
 
     public function redirect(Request $request, RobloxOAuthService $oauth): RedirectResponse
     {
-        abort_unless($oauth->configured(), 404);
+        if (! $oauth->configured()) {
+            return redirect('/auth/roblox')->with('trade_error', TradePresenter::oauthUnavailableCopy());
+        }
+
         TradeAuthRedirect::storeReturnTo($request);
         $auth = $oauth->authorization();
         $request->session()->put('roblox_oauth_state', $auth['state']);

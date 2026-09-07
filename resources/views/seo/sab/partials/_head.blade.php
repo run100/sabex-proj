@@ -75,6 +75,7 @@
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4457622474147266"
         crossorigin="anonymous"></script>
 
+<link rel="stylesheet" href="/static/css/sab-tokens.css" />
 <link rel="stylesheet" href="{{ $cssHref ?? \App\Services\Seo\SabRenderService::CSS_HREF_LARAVEL }}" />
 
 {!! $websiteJsonLd ?? '' !!}

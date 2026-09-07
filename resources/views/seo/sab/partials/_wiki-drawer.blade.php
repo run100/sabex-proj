@@ -41,13 +41,16 @@
 
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'.($paths[$name] ?? '').'</svg>';
   };
+  $wikiDrawerTradeBase = request()->getHost() === \App\Support\SabHost::host('www')
+    ? ''
+    : rtrim(\App\Support\SabHost::origin('www'), '/');
   $wikiDrawerCopy = $t ?? [];
   $wikiDrawerToolItems = [
     ['href' => $wikiDrawerLocaleHref(\App\Services\Seo\SabRenderService::PAGE_TRADING_CALCULATOR), 'label' => $wikiDrawerCopy['nav_calculator'] ?? 'Calculator', 'icon' => 'calculator', 'active' => $wikiDrawerPathActive(\App\Services\Seo\SabRenderService::PAGE_TRADING_CALCULATOR)],
     ['href' => $wikiDrawerHref(\App\Services\Seo\SabRenderService::PAGE_VALUE_LIST), 'label' => $wikiDrawerCopy['nav_value_list'] ?? 'SAB Values', 'icon' => 'values', 'active' => $wikiDrawerPathActive(\App\Services\Seo\SabRenderService::PAGE_VALUE_LIST)],
     ['href' => $wikiDrawerLocaleHref(\App\Services\Seo\SabRenderService::PAGE_CODES), 'label' => $wikiDrawerCopy['nav_codes'] ?? 'Codes', 'icon' => 'codes', 'active' => $wikiDrawerPathActive(\App\Services\Seo\SabRenderService::PAGE_CODES)],
     ['href' => $wikiDrawerNewsHref, 'label' => $wikiDrawerCopy['nav_news'] ?? 'News', 'icon' => 'news', 'active' => str_contains($wikiDrawerCanonicalPath, '/news')],
-    ['href' => $wikiDrawerLocaleHref(\App\Services\Seo\SabRenderService::PAGE_EXIST_COUNTS_LIST), 'label' => $wikiDrawerCopy['nav_exist_counts_list'] ?? 'Exist Count List', 'icon' => 'list', 'active' => $wikiDrawerPathActive(\App\Services\Seo\SabRenderService::PAGE_EXIST_COUNTS_LIST)],
+    ['href' => $wikiDrawerLocaleHref(\App\Services\Seo\SabRenderService::PAGE_EXIST_COUNTS_LIST), 'label' => 'Exist Count', 'icon' => 'list', 'active' => $wikiDrawerPathActive(\App\Services\Seo\SabRenderService::PAGE_EXIST_COUNTS_LIST)],
     ['href' => $wikiDrawerHref(\App\Services\Seo\SabRenderService::PAGE_EXIST_COUNT_GALLERY), 'label' => $wikiDrawerCopy['nav_exist_count_gallery'] ?? 'Exist Count Gallery', 'icon' => 'gallery', 'active' => $wikiDrawerPathActive(\App\Services\Seo\SabRenderService::PAGE_EXIST_COUNT_GALLERY)],
   ];
   $wikiDrawerItems = [
@@ -83,22 +86,12 @@
       </button>
     </div>
     <nav class="sab-wiki-drawer__nav" aria-label="Menu">
-      @if(!empty($tradesDrawerItems))
-      <p class="sab-wiki-drawer__group">Trades</p>
-      @foreach($tradesDrawerItems as $item)
-        @if(($item['method'] ?? 'get') === 'post')
-        <form method="post" action="{{ $item['href'] }}" class="sab-wiki-drawer__form">
-          @csrf
-          <button type="submit" class="sab-wiki-drawer__link">
-            <span class="sab-wiki-drawer__icon">{!! $wikiDrawerIcon($item['icon'] ?? '') !!}</span>
-            <span>{{ $item['label'] }}</span>
-          </button>
-        </form>
-        @else
-        <a href="{{ $item['href'] }}" class="sab-wiki-drawer__link{{ !empty($item['active']) ? ' is-active' : '' }}"><span class="sab-wiki-drawer__icon">{!! $wikiDrawerIcon($item['icon'] ?? '') !!}</span><span>{{ $item['label'] }}</span></a>
-        @endif
-      @endforeach
-      @endif
+      <p class="sab-wiki-drawer__group">Trading</p>
+      <a href="{{ $wikiDrawerTradeBase }}{{ \App\Support\TradePaths::create() }}" class="sab-wiki-drawer__link{{ $wikiDrawerCanonicalPath === \App\Support\TradePaths::create() ? ' is-active' : '' }}"><span class="sab-wiki-drawer__icon">{!! $wikiDrawerIcon('post') !!}</span><span>Create Trade Ad</span></a>
+      <a href="{{ $wikiDrawerTradeBase }}{{ \App\Support\TradePaths::marketplace() }}" class="sab-wiki-drawer__link{{ $wikiDrawerCanonicalPath === \App\Support\TradePaths::marketplace() ? ' is-active' : '' }}"><span class="sab-wiki-drawer__icon">{!! $wikiDrawerIcon('list') !!}</span><span>View Trade Ads</span></a>
+      <div data-nav-auth-drawer>
+        <a href="{{ \App\Support\TradePresenter::wwwUrl('/auth/roblox') }}" class="sab-wiki-drawer__link" data-nav-sign-in><span class="sab-wiki-drawer__icon">{!! $wikiDrawerIcon('login') !!}</span><span>Login</span></a>
+      </div>
       <p class="sab-wiki-drawer__group">Tools</p>
       @foreach($wikiDrawerToolItems as $item)
       <a href="{{ $item['href'] }}" class="sab-wiki-drawer__link{{ $item['active'] ? ' is-active' : '' }}"><span class="sab-wiki-drawer__icon">{!! $wikiDrawerIcon($item['icon']) !!}</span><span>{{ $item['label'] }}</span></a>
@@ -129,7 +122,7 @@
   .sab-wiki-drawer__backdrop {
     position: fixed;
     inset: 0;
-    z-index: 60;
+    z-index: 85;
     background: rgba(2, 6, 23, .62);
     opacity: 0;
     pointer-events: none;
@@ -140,7 +133,7 @@
     top: 0;
     left: 0;
     bottom: 0;
-    z-index: 70;
+    z-index: 90;
     display: flex;
     flex-direction: column;
     width: min(20rem, 86vw);
@@ -202,7 +195,8 @@
   .sab-wiki-drawer__form {
     margin: 0;
   }
-  .sab-wiki-drawer__form .sab-wiki-drawer__link {
+  .sab-wiki-drawer__form .sab-wiki-drawer__link,
+  button.sab-wiki-drawer__link {
     width: 100%;
     border: 0;
     background: transparent;
@@ -272,31 +266,29 @@
   body.is-wiki-drawer-open {
     overflow: hidden;
   }
-  @media (min-width: 768px) {
-    .sab-wiki-drawer {
-      display: none;
-    }
-  }
 </style>
 <script>
   (function () {
     var root = document.querySelector('[data-wiki-drawer-root]');
-    var trigger = document.querySelector('[data-wiki-drawer-open]');
     var panel = document.getElementById('sab-wiki-drawer');
-    if (!root || !trigger || !panel) return;
+    if (!root || !panel) return;
 
-    var desktop = window.matchMedia('(min-width: 768px)');
     var lastFocus = null;
+
+    function triggers() {
+      return document.querySelectorAll('[data-wiki-drawer-open]');
+    }
 
     function isOpen() {
       return root.classList.contains('is-open');
     }
 
     function setOpen(next) {
-      if (desktop.matches) next = false;
       root.classList.toggle('is-open', next);
       document.body.classList.toggle('is-wiki-drawer-open', next);
-      trigger.setAttribute('aria-expanded', next ? 'true' : 'false');
+      triggers().forEach(function (button) {
+        button.setAttribute('aria-expanded', next ? 'true' : 'false');
+      });
       panel.setAttribute('aria-hidden', next ? 'false' : 'true');
       if (next) {
         panel.removeAttribute('inert');
@@ -309,11 +301,13 @@
       }
     }
 
-    trigger.addEventListener('click', function () {
-      setOpen(!isOpen());
-    });
-
-    root.addEventListener('click', function (event) {
+    document.addEventListener('click', function (event) {
+      var opener = event.target && event.target.closest('[data-wiki-drawer-open]');
+      if (opener) {
+        event.preventDefault();
+        setOpen(!isOpen());
+        return;
+      }
       if (event.target && event.target.closest('[data-wiki-drawer-close]')) {
         setOpen(false);
       }
@@ -322,12 +316,6 @@
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape' && isOpen()) setOpen(false);
     });
-
-    if (typeof desktop.addEventListener === 'function') {
-      desktop.addEventListener('change', function () {
-        if (desktop.matches) setOpen(false);
-      });
-    }
   })();
 </script>
 @endonce

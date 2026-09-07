@@ -41,8 +41,25 @@ class SabWikiTopicSourceContractTest extends TestCase
         $this->assertStringNotContainsString('/wiki/events', $rules);
         $this->assertStringNotContainsString('/wiki/admin-event', $rules);
         $this->assertStringNotContainsString('/wiki/rituals', $rules);
+        $this->assertStringNotContainsString('/wiki/all-fusions', $rules);
+        $this->assertStringNotContainsString('/wiki/all-lucky-blocks', $rules);
         $this->assertStringNotContainsString('/wiki/all-rebirths', $rules);
         $this->assertStringNotContainsString('/all-og-brainrots/ /all-og-brainrots 301', $rules);
         $this->assertDoesNotMatchRegularExpression('/(?:^|\n)\/all-rebirths(?:\/|\s)/', $rules);
+    }
+
+    public function test_routable_wiki_slugs_keep_lucky_blocks_preview_and_drop_fusions_rituals(): void
+    {
+        $routable = SabWikiPageDefinitions::nestedPreviewSlugs();
+
+        $this->assertContains('all-lucky-blocks', $routable);
+        $this->assertContains('steal-a-brainrot-rebirth-list', $routable);
+        $this->assertContains('admin-abuse', $routable);
+        $this->assertNotContains('all-fusions', $routable);
+        $this->assertNotContains('rituals', $routable);
+        $this->assertContains(SabWikiPageDefinitions::PAGE_WIKI_LUCKY_BLOCKS, SabWikiPageDefinitions::previewOnlyTopicPageSlugs());
+        $this->assertNotContains(SabWikiPageDefinitions::PAGE_WIKI_LUCKY_BLOCKS, SabWikiPageDefinitions::shippingPageSlugs());
+        $this->assertNotContains(SabWikiPageDefinitions::PAGE_WIKI_FUSIONS, SabWikiPageDefinitions::routablePageSlugs());
+        $this->assertNotContains(SabWikiPageDefinitions::PAGE_WIKI_RITUALS, SabWikiPageDefinitions::routablePageSlugs());
     }
 }

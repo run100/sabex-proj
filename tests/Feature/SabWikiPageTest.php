@@ -641,22 +641,15 @@ class SabWikiPageTest extends TestCase
         $page->assertDontSee('Fat Sammy', false);
         $page->assertDontSee('Tipi Topi Taco', false);
 
-        $rituals = $this->get('/wiki/rituals');
-        $rituals->assertOk();
-        $rituals->assertSee('<h1 class="sab-wiki-title">Steal a Brainrot Rituals</h1>', false);
-        $rituals->assertDontSee('"@type":"HowTo"', false);
-        $rituals->assertSee('No confirmed items are stored for this topic yet', false);
+        $this->get('/wiki/rituals')->assertNotFound();
+        $this->get('/wiki/rituals.html')->assertNotFound();
+        $this->get('/wiki/all-fusions')->assertNotFound();
+        $this->get('/wiki/all-fusions.html')->assertNotFound();
 
         $rebirths = $this->get('/wiki/steal-a-brainrot-rebirth-list');
         $rebirths->assertOk();
         $rebirths->assertSee('<h1 class="sab-wiki-title">Steal a Brainrot Rebirth List — All 19 Levels</h1>', false);
         $rebirths->assertDontSee('No confirmed items are stored for this topic yet', false);
-
-        $fusions = $this->get('/wiki/all-fusions');
-        $fusions->assertOk();
-        $fusions->assertSee('<h1 class="sab-wiki-title">All Confirmed Fusions</h1>', false);
-        $fusions->assertSee('All Steal a Brainrot Fusions | Confirmed Fuse &amp; Craft Items', false);
-        $fusions->assertDontSee('Fusion recipes', false);
     }
 
     public function test_admin_abuse_page_renders_confirmed_schedule_event_schema_and_narrow_related_items(): void

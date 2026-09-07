@@ -17,7 +17,9 @@
     },
     "dependencies": {
         "@element-plus/icons-vue": "^2.3.2",
+        "@tinymce/tinymce-vue": "^6.3.0",
         "element-plus": "^2.11.0",
+        "tinymce": "^8.9.0",
         "vue-router": "^4.6.4"
     },
     "optionalDependencies": {

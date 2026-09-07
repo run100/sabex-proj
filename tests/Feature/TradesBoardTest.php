@@ -3,9 +3,15 @@
 namespace Tests\Feature;
 
 use App\Models\SeoItem;
+use App\Models\TradeEvent;
 use App\Models\TradeListing;
+use App\Models\TradeListingItemTrait;
+use App\Models\TradeNotification;
 use App\Models\TradeUser;
+use App\Services\Seo\SabRotCalculatorSyncService;
+use App\Services\Trades\TradeJoinService;
 use App\Services\Trades\TradeListingService;
+use App\Support\TradeSeo;
 use Tests\Concerns\CreatesSabWikiTables;
 use Tests\Concerns\CreatesTradeTables;
 use Tests\TestCase;
@@ -43,6 +49,9 @@ class TradesBoardTest extends TestCase
 
         $listing = TradeListing::query()->first();
         $this->assertNotNull($listing);
+        $this->assertSame(0, (int) $listing->sort_order);
+        $this->assertSame(TradeListing::FLAG_NO, $listing->is_hot);
+        $this->assertSame(TradeListing::FLAG_NO, $listing->is_top);
         $this->assertSame('win', $listing->result_snapshot);
         $this->assertSame(10.0, (float) $listing->offering_value_snapshot);
         $this->assertSame(12.0, (float) $listing->looking_value_snapshot);
@@ -52,19 +61,373 @@ class TradesBoardTest extends TestCase
             ->assertSee('Noobini')
             ->assertSee('Cappuccino')
             ->assertSee('Trader')
-            ->assertSee('Offering')
-            ->assertSee('Looking for')
-            ->assertSee('Open');
+            ->assertSee("They're offering")
+            ->assertSee("They're looking for")
+            ->assertSee('Value')
+            ->assertSee('Demand')
+            ->assertSee('HIGH')
+            ->assertSee('Waiting for trade');
         $html = $home->getContent();
-        $empty = substr_count($html, 'trades-item-slot--empty');
-        $filled = substr_count($html, 'trades-item-slot--filled');
-        $this->assertSame(16, $empty);
-        $this->assertSame(2, $filled);
-        $this->assertSame(18, $empty + $filled);
+        $this->assertSame(0, substr_count($html, 'trades-item-slot--empty'));
+        $this->assertSame(2, substr_count($html, 'trades-item-slot--filled'));
+        $this->assertStringContainsString('trades-card-board__arrow', $html);
+        $this->assertStringContainsString('trades-item-slot__mut', $html);
+        $this->assertStringNotContainsString('trades-card-board__flag', $html);
 
         $this->get('http://www.sabex.lab/trading/'.$listing->public_id)
             ->assertOk()
             ->assertSee($listing->public_id);
+    }
+
+    public function test_publish_persists_traits_and_shows_them_on_the_board(): void
+    {
+        $this->seedCalculatorMeta([
+            ['name' => 'Rainbow Balloon', 'multiplier' => 6.5, 'valueMultiplier' => 1.25],
+        ]);
+        $user = $this->tradeUser('67890', 'TraitTrader');
+
+        $this->actingAs($user, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades', [
+                'offering' => [[
+                    'slug' => 'noobini',
+                    'traits' => [['name' => 'Rainbow Balloon']],
+                    'trait_names' => ['Rainbow Balloon'],
+                ]],
+                'looking_for' => [['slug' => 'cappuccino']],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.trade.offering.0.traits.0.name', 'Rainbow Balloon');
+
+        $listing = TradeListing::query()->with('items.traits')->first();
+        $this->assertNotNull($listing);
+        $offering = $listing->items->firstWhere('side', 'offering');
+        $this->assertNotNull($offering);
+        $this->assertSame(1, TradeListingItemTrait::query()->where('listing_item_id', $offering->id)->count());
+        $this->assertSame('Rainbow Balloon', $offering->traits->first()?->trait_name_snapshot);
+        $this->assertSame('Rainbow Balloon', $offering->traits->first()?->trait_name);
+
+        $this->get('http://www.sabex.lab/trading')
+            ->assertOk()
+            ->assertSee('Rainbow Balloon')
+            ->assertSee('+1 Traits')
+            ->assertSee('Traits:');
+
+        $this->get('http://www.sabex.lab/trading/'.$listing->public_id)
+            ->assertOk()
+            ->assertSee('Rainbow Balloon')
+            ->assertSee('Mutation:')
+            ->assertSee('Traits:');
+    }
+
+    public function test_trade_detail_uses_truncated_title_and_show_layout(): void
+    {
+        $this->seedItem('garama-and-madundung', 'Garama and Madundung', 100);
+        $this->seedItem('bumbatron', 'Bumbatron', 20);
+        $this->seedItem('chicleteira-surfeiteira', 'Chicleteira Surfeiteira', 80);
+        $this->seedItem('esok-goala', 'Esok Goala', 30);
+        $user = $this->tradeUser('55501', 'DetailTrader');
+
+        $this->actingAs($user, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades', [
+                'offering' => [
+                    ['slug' => 'garama-and-madundung'],
+                    ['slug' => 'bumbatron'],
+                    ['slug' => 'garama-and-madundung'],
+                ],
+                'looking_for' => [
+                    ['slug' => 'chicleteira-surfeiteira'],
+                    ['slug' => 'esok-goala'],
+                ],
+            ])
+            ->assertCreated();
+
+        $listing = TradeListing::query()->first();
+        $this->assertNotNull($listing);
+
+        $this->post('http://www.sabex.lab/logout');
+
+        $page = $this->get('http://www.sabex.lab/trading/'.$listing->public_id)
+            ->assertOk()
+            ->assertSee('trades-show__badge--open', false)
+            ->assertSee('Trade ID:')
+            ->assertSee('Share Trade')
+            ->assertSee("They're offering")
+            ->assertSee("They're looking for")
+            ->assertSee('Make Offer')
+            ->assertSee('Message')
+            ->assertSee('Home')
+            ->assertSee('All Trades')
+            ->assertSee(TradeSeo::listing($listing)['h1'])
+            ->assertSee('Value Calculator')
+            ->assertSee('Value List')
+            ->assertSee('href="/steal-a-brainrot-trading-calculator"', false)
+            ->assertSee('href="/sab-value-list"', false)
+            ->assertSee('Posted')
+            ->assertSee('Value')
+            ->assertSee('Demand')
+            ->assertSee('HIGH')
+            ->assertSee('Mutation:')
+            ->assertSee('Default')
+            ->assertSee('Traits:')
+            ->assertSee('trades-show__mut', false)
+            ->assertSee($listing->public_id)
+            ->assertSee('/auth/roblox?return_to='.rawurlencode('/trading/'.$listing->public_id), false)
+            ->assertDontSee('Quick replies')
+            ->assertDontSee('Cancel listing')
+            ->assertDontSee('trades-view-btn', false)
+            ->assertDontSee('Join Trade')
+            ->assertDontSee('data-offer-open', false)
+            ->assertDontSee('Send an offer')
+            ->assertDontSee('Posted By')
+            ->assertDontSee('Accepted By');
+
+        preg_match('/<title>(.*?)<\/title>/s', $page->getContent(), $match);
+        $documentTitle = trim(html_entity_decode(strip_tags($match[1] ?? ''), ENT_QUOTES));
+        $this->assertLessThanOrEqual(60, mb_strlen($documentTitle));
+        $this->assertStringStartsWith('Trading ', $documentTitle);
+        $this->assertStringContainsString('SABExistCount', $documentTitle);
+    }
+
+    public function test_trade_detail_counts_view_without_timeline_event(): void
+    {
+        $owner = $this->tradeUser('55510', 'Viewer');
+        $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+        $this->assertSame(0, (int) $listing->views_count);
+
+        TradeEvent::query()->create([
+            'listing_id' => $listing->id,
+            'event_type' => 'trade_viewed',
+            'created_at' => now(),
+        ]);
+
+        $this->get('http://www.sabex.lab/trading/'.$listing->public_id)
+            ->assertOk()
+            ->assertSee('Trade posted')
+            ->assertDontSee('trade_viewed');
+
+        $listing->refresh();
+        $this->assertSame(1, (int) $listing->views_count);
+        $this->assertSame(1, TradeEvent::query()->where('listing_id', $listing->id)->where('event_type', 'trade_viewed')->count());
+
+        $this->get('http://www.sabex.lab/trading/'.$listing->public_id)
+            ->assertOk()
+            ->assertDontSee('trade_viewed');
+        $this->assertSame(1, (int) $listing->fresh()->views_count);
+
+        $timeline = $this->getJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id)
+            ->assertOk()
+            ->assertJsonPath('data.trade.views', 1)
+            ->json('data.trade.timeline');
+        $types = collect($timeline)->pluck('type');
+        $this->assertTrue($types->contains('trade_posted'));
+        $this->assertFalse($types->contains('trade_viewed'));
+    }
+
+    public function test_logged_in_visitor_sees_offer_and_message_modal(): void
+    {
+        $owner = $this->tradeUser('55502', 'Owner');
+        $buyer = $this->tradeUser('55503', 'Buyer');
+        $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+
+        $visitor = $this->actingAs($buyer, 'trades')
+            ->get('http://www.sabex.lab/trading/'.$listing->public_id)
+            ->assertOk()
+            ->assertSee('Make Offer')
+            ->assertSee('Message')
+            ->assertSee('data-message-open', false)
+            ->assertSee('data-offer-open', false)
+            ->assertSee('data-offer-form', false)
+            ->assertSee('Send an offer')
+            ->assertSee('You give')
+            ->assertSee('You get')
+            ->assertSee("Hi! I have the items you're looking for.", false)
+            ->assertSee('Quick replies')
+            ->assertSee("I'm ready to trade!")
+            ->assertSee('Please mark the trade as completed')
+            ->assertSee('Send a message...')
+            ->assertDontSee('Cancel listing')
+            ->assertDontSee('Posted By')
+            ->assertDontSee('Accepted By')
+            ->assertDontSee('Submit report');
+
+        $this->assertStringNotContainsString(
+            'action="/api/v1/trading/trades/'.$listing->public_id.'/join" data-json-form',
+            $visitor->getContent()
+        );
+
+        $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/trading/'.$listing->public_id)
+            ->assertOk()
+            ->assertSee('Cancel listing')
+            ->assertSee('Message')
+            ->assertSee('data-message-open', false)
+            ->assertSee('Quick replies')
+            ->assertDontSee('Make Offer')
+            ->assertDontSee('data-offer-open', false)
+            ->assertDontSee('Send an offer')
+            ->assertDontSee('Submit report');
+    }
+
+    public function test_send_offer_keeps_listing_open_and_owner_can_accept_or_reject(): void
+    {
+        $owner = $this->tradeUser('55520', 'OfferOwner');
+        $buyer = $this->tradeUser('55521', 'OfferBuyer');
+        $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+
+        $this->actingAs($buyer, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/join', [
+                'note' => 'Hi! I have the items you\'re looking for.',
+            ])
+            ->assertCreated();
+
+        $listing->refresh();
+        $this->assertSame(TradeListing::STATUS_OPEN, $listing->status);
+        $this->assertNull($listing->counterparty_user_id);
+
+        $this->actingAs($buyer, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/join')
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'JOIN_ALREADY_EXISTS');
+
+        $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/trading/'.$listing->public_id)
+            ->assertOk()
+            ->assertSee('Join requests')
+            ->assertSee('Accept')
+            ->assertSee('Reject')
+            ->assertSee('trades-show__badge--open', false)
+            ->assertSee('Trade ID:')
+            ->assertSee('Share Trade')
+            ->assertSee("Hi! I have the items you're looking for.")
+            ->assertDontSee('Posted By')
+            ->assertDontSee('Accepted By')
+            ->assertDontSee('trades-show__badge--pending', false);
+
+        $this->actingAs($buyer, 'trades')
+            ->get('http://www.sabex.lab/trading/'.$listing->public_id)
+            ->assertOk()
+            ->assertSee('Make Offer')
+            ->assertSee('trades-show__badge--open', false)
+            ->assertSee('Share Trade')
+            ->assertDontSee('Posted By')
+            ->assertDontSee('Participants');
+    }
+
+    public function test_accepted_listing_shows_participants_and_pending_badge(): void
+    {
+        $owner = $this->tradeUser('55522', 'PostedOwner');
+        $buyer = $this->tradeUser('55523', 'AcceptedBuyer');
+        $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+
+        $this->actingAs($buyer, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/join')
+            ->assertCreated();
+
+        $joinId = $this->actingAs($owner, 'trades')
+            ->getJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/join-requests')
+            ->assertOk()
+            ->json('data.items.0.public_id');
+
+        $this->actingAs($owner, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/join-requests/'.$joinId.'/accept')
+            ->assertOk()
+            ->assertJsonPath('data.trade.status', 'pending');
+
+        $page = $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/trading/'.$listing->public_id)
+            ->assertOk()
+            ->assertSee('Participants')
+            ->assertSee('Posted By')
+            ->assertSee('Accepted By')
+            ->assertSee('PostedOwner')
+            ->assertSee('AcceptedBuyer')
+            ->assertSee('Pending')
+            ->assertSee('Mark Completed')
+            ->assertSee('Mark Failed')
+            ->assertDontSee('Join requests')
+            ->assertDontSee('Make Offer');
+
+        $html = $page->getContent();
+        $this->assertStringContainsString('trades-show__badge--pending', $html);
+        $this->assertStringNotContainsString('trades-show__badge">', $html);
+        $this->assertStringNotContainsString('join-requests/', $html);
+    }
+
+    public function test_trade_messages_use_notifications_and_block_self_send(): void
+    {
+        $owner = $this->tradeUser('55504', 'Owner');
+        $buyer = $this->tradeUser('55505', 'Buyer');
+        $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+        $url = 'http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/messages';
+
+        $this->getJson($url)->assertUnauthorized()->assertJsonPath('error.code', 'AUTH_REQUIRED');
+
+        $this->actingAs($owner, 'trades')
+            ->postJson($url, ['message' => "I'm ready to trade!"])
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'INVALID_MESSAGE');
+
+        $this->actingAs($buyer, 'trades')
+            ->postJson($url, ['message' => "I'm ready to trade!"])
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.message.message', "I'm ready to trade!")
+            ->assertJsonPath('data.message.mine', true);
+
+        $this->actingAs($buyer, 'trades')
+            ->getJson($url)
+            ->assertOk()
+            ->assertJsonPath('data.items.0.message', "I'm ready to trade!")
+            ->assertJsonPath('data.items.0.mine', true);
+
+        $this->actingAs($owner, 'trades')
+            ->getJson($url)
+            ->assertOk()
+            ->assertJsonPath('data.items.0.message', "I'm ready to trade!")
+            ->assertJsonPath('data.items.0.mine', false);
+
+        $this->actingAs($owner, 'trades')
+            ->postJson($url, ['message' => "I'll join you!"])
+            ->assertCreated()
+            ->assertJsonPath('data.message.message', "I'll join you!")
+            ->assertJsonPath('data.message.mine', true);
+
+        $this->actingAs($owner, 'trades')
+            ->getJson('http://www.sabex.lab/api/v1/notifications')
+            ->assertOk()
+            ->assertJsonPath('data.items.0.message', "I'm ready to trade!");
+
+        $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/notifications')
+            ->assertOk()
+            ->assertSee("I'm ready to trade!");
+
+        $this->assertSame(2, TradeNotification::query()->where('listing_id', $listing->id)->where('type', 'trade_message')->count());
+        $this->assertSame(1, TradeNotification::query()->where('user_id', $owner->id)->where('type', 'trade_message')->count());
+        $this->assertSame(1, TradeNotification::query()->where('user_id', $buyer->id)->where('type', 'trade_message')->count());
+    }
+
+    public function test_unknown_trait_is_rejected_and_not_stored(): void
+    {
+        $this->seedCalculatorMeta([
+            ['name' => 'Rainbow Balloon', 'multiplier' => 6.5, 'valueMultiplier' => 1.25],
+        ]);
+        $user = $this->tradeUser('11111', 'BadTrait');
+
+        $this->actingAs($user, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades', [
+                'offering' => [[
+                    'slug' => 'noobini',
+                    'traits' => [['name' => 'Not A Real Trait']],
+                ]],
+                'looking_for' => [['slug' => 'cappuccino']],
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'INVALID_TRAIT');
+
+        $this->assertSame(0, TradeListing::query()->count());
+        $this->assertSame(0, TradeListingItemTrait::query()->count());
     }
 
     public function test_guest_cannot_publish(): void
@@ -137,6 +500,85 @@ class TradesBoardTest extends TestCase
             ->assertSee('Noobini');
     }
 
+    public function test_repeat_confirm_does_not_spam_timeline_and_waits_for_other_party(): void
+    {
+        $owner = $this->tradeUser('55530', 'WaitOwner');
+        $buyer = $this->tradeUser('55531', 'WaitBuyer');
+        $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+
+        $this->actingAs($buyer, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/join')
+            ->assertCreated();
+        $joinId = $this->actingAs($owner, 'trades')
+            ->getJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/join-requests')
+            ->json('data.items.0.public_id');
+        $this->actingAs($owner, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/join-requests/'.$joinId.'/accept')
+            ->assertOk();
+
+        $this->actingAs($owner, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/confirm', ['confirmation' => 'completed'])
+            ->assertOk()
+            ->assertJsonPath('data.trade.status', 'pending_confirmation');
+        $this->actingAs($owner, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/confirm', ['confirmation' => 'completed'])
+            ->assertOk()
+            ->assertJsonPath('data.trade.status', 'pending_confirmation');
+
+        $this->assertSame(1, TradeEvent::query()->where('listing_id', $listing->id)->where('event_type', 'confirmation_completed')->count());
+        $this->assertSame(1, TradeNotification::query()->where('listing_id', $listing->id)->where('type', 'other_user_confirmed')->count());
+
+        $waitingTimeline = $this->actingAs($owner, 'trades')
+            ->getJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id)
+            ->assertOk()
+            ->assertJsonPath('data.trade.status', 'pending_confirmation')
+            ->json('data.trade.timeline');
+        $waitingTypes = collect($waitingTimeline)->pluck('type');
+        $this->assertSame($waitingTypes->count(), $waitingTypes->unique()->count());
+        $this->assertTrue(collect($waitingTimeline)->pluck('label')->contains('Marked completed'));
+
+        $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/trading/'.$listing->public_id)
+            ->assertOk()
+            ->assertSee('Waiting for WaitBuyer to confirm')
+            ->assertSee('Awaiting confirmation')
+            ->assertSee('Trade pending')
+            ->assertDontSee('Mark Completed')
+            ->assertSee('Mark Failed')
+            ->assertDontSee('confirmation_completed');
+
+        $this->actingAs($buyer, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/confirm', ['confirmation' => 'completed'])
+            ->assertOk()
+            ->assertJsonPath('data.trade.status', 'completed');
+
+        $this->assertSame(1, TradeEvent::query()->where('listing_id', $listing->id)->where('event_type', 'trade_completed')->count());
+
+        $doneTimeline = $this->actingAs($owner, 'trades')
+            ->getJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id)
+            ->assertOk()
+            ->assertJsonPath('data.trade.status', 'completed')
+            ->json('data.trade.timeline');
+        $doneTypes = collect($doneTimeline)->pluck('type');
+        $this->assertSame($doneTypes->count(), $doneTypes->unique()->count());
+        $this->assertTrue(collect($doneTimeline)->pluck('label')->contains('Trade completed'));
+
+        $page = $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/trading/'.$listing->public_id)
+            ->assertOk()
+            ->assertSee('Completed')
+            ->assertSee('Trade completed')
+            ->assertDontSee('Mark Completed')
+            ->assertDontSee('Mark Failed')
+            ->assertDontSee('Waiting for');
+
+        $this->assertSame(0, substr_count($page->getContent(), 'Marked completed'));
+        $this->assertSame(1, substr_count($page->getContent(), 'Trade completed'));
+        $this->assertSame(1, substr_count($page->getContent(), 'Trade posted'));
+        $this->assertSame(1, substr_count($page->getContent(), 'Trade joined'));
+        $this->assertSame(1, substr_count($page->getContent(), 'Trade pending'));
+    }
+
     public function test_confirmation_conflict_is_disputed(): void
     {
         $owner = $this->tradeUser('11', 'Owner');
@@ -207,53 +649,149 @@ class TradesBoardTest extends TestCase
 
     public function test_activity_page_copy_requires_login(): void
     {
-        $this->get('http://www.sabex.lab/user/activity')
-            ->assertRedirect('/auth/roblox?return_to='.urlencode('/user/activity'));
+        $this->get('http://www.sabex.lab/user/offers')
+            ->assertRedirect('/auth/roblox?return_to='.urlencode('/user/offers'));
         $this->get('http://www.sabex.lab/trading/completed')
             ->assertOk()
             ->assertSee('Completed Steal a Brainrot Trades');
 
         $user = $this->tradeUser('51', 'Watcher');
         $this->actingAs($user, 'trades')
-            ->get('http://www.sabex.lab/user/activity')
+            ->get('http://www.sabex.lab/user/offers')
             ->assertOk()
-            ->assertSee('<title>SABExistCount - Steal a Brainrot Trade Activity &amp; Recent Trades</title>', false)
-            ->assertSee('Track recent Steal a Brainrot trade activity on SABExistCount', false)
-            ->assertSee('<h1>Steal a Brainrot Trade Activity</h1>', false)
-            ->assertSee('Browse recent Steal a Brainrot trading activity, including newly posted', false)
-            ->assertDontSee('<h1 class="mb-4 text-2xl font-black">Activity</h1>', false)
-            ->assertDontSee('<title>Trade activity</title>', false)
-            ->assertSee('href="/user/activity?status=all"', false)
-            ->assertSee('href="/user/activity?status=pending"', false)
-            ->assertSee('href="/user/activity?status=completed"', false)
-            ->assertSee('href="/user/activity?status=failed"', false)
-            ->assertDontSee('href="/user/activity?status=open"', false)
-            ->assertDontSee('href="/user/activity?status=disputed"', false);
+            ->assertSee('<title>SABExistCount - Steal a Brainrot Offers</title>', false)
+            ->assertSee('name="robots" content="noindex,nofollow"', false)
+            ->assertSee('<h1>Offers</h1>', false)
+            ->assertSee('Post a trade ad')
+            ->assertSee('Accept or decline offers on your trade ads before a chat is opened.')
+            ->assertSee('No offers waiting')
+            ->assertSee('href="/user/offers?status=ads"', false)
+            ->assertSee('href="/user/offers?status=received"', false)
+            ->assertSee('href="/user/offers?status=sent"', false)
+            ->assertSee('href="/user/offers?status=pending"', false)
+            ->assertSee('href="/user/offers?status=completed"', false)
+            ->assertSee('href="/user/offers?status=expired"', false)
+            ->assertDontSee('href="/user/offers?status=all"', false)
+            ->assertDontSee('<h1>Steal a Brainrot Trade Activity</h1>', false)
+            ->assertSee('Home')
+            ->assertSee('All Trades')
+            ->assertSee('Value Calculator')
+            ->assertSee('Value List')
+            ->assertSee('href="/steal-a-brainrot-trading-calculator"', false)
+            ->assertSee('href="/sab-value-list"', false);
+
+        $this->actingAs($user, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=ads')
+            ->assertOk()
+            ->assertSee('Trade ads you posted. Open one to manage it or wait for offers.')
+            ->assertSee('No ads yet');
+        $this->actingAs($user, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=sent')
+            ->assertOk()
+            ->assertSee("Offers you sent on someone else's trade ad");
+        $this->actingAs($user, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=completed')
+            ->assertOk()
+            ->assertSee('Trades you finished after both sides marked completed.');
+        $this->actingAs($user, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=expired')
+            ->assertOk()
+            ->assertSee('Trade ads that timed out before both sides finished');
+        $this->actingAs($user, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=pending')
+            ->assertOk()
+            ->assertSee('Trades in progress after an offer was accepted. Finish in Roblox, then both sides mark completed.')
+            ->assertSee('No pending trades');
     }
 
     public function test_activity_tabs_count_open_listing_only_in_all(): void
     {
-        $user = $this->tradeUser('52', 'Poster');
-        $listing = app(TradeListingService::class)->create($user, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+        $owner = $this->tradeUser('52', 'Poster');
+        $buyer = $this->tradeUser('53', 'OfferBuyer');
+        $ownListing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+        $theirListing = app(TradeListingService::class)->create($buyer, [['slug' => 'cappuccino']], [['slug' => 'noobini']]);
 
-        $this->actingAs($user, 'trades')
-            ->get('http://www.sabex.lab/user/activity')
+        $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/user/offers')
             ->assertOk()
-            ->assertSee('>All <span class="trades-activity-tabs__count">1</span>', false)
-            ->assertSee('>Pending <span class="trades-activity-tabs__count">0</span>', false)
-            ->assertSee('>Completed <span class="trades-activity-tabs__count">0</span>', false)
-            ->assertSee('>Failed <span class="trades-activity-tabs__count">0</span>', false)
-            ->assertSee($listing->public_id)
-            ->assertDontSee('href="/user/activity?status=open"', false)
-            ->assertDontSee('href="/user/activity?status=disputed"', false);
+            ->assertSee('All Ads')
+            ->assertSee('Received')
+            ->assertSee('Sent')
+            ->assertSee('Pending')
+            ->assertSee('Completed')
+            ->assertSee('Expired')
+            ->assertSee('No offers waiting')
+            ->assertDontSee($ownListing->public_id)
+            ->assertDontSee($theirListing->public_id)
+            ->assertDontSee('href="/user/offers?status=all"', false);
 
-        $this->actingAs($user, 'trades')
-            ->get('http://www.sabex.lab/user/activity?status=pending')
+        $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=ads')
             ->assertOk()
-            ->assertSee('>All <span class="trades-activity-tabs__count">1</span>', false)
-            ->assertSee('>Pending <span class="trades-activity-tabs__count">0</span>', false)
-            ->assertDontSee($listing->public_id)
-            ->assertSee('No trades in this tab.');
+            ->assertSee('Trade ads you posted. Open one to manage it or wait for offers.')
+            ->assertSee($ownListing->public_id)
+            ->assertDontSee($theirListing->public_id);
+
+        $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=pending')
+            ->assertOk()
+            ->assertSee('Trades in progress after an offer was accepted. Finish in Roblox, then both sides mark completed.')
+            ->assertDontSee($ownListing->public_id)
+            ->assertDontSee($theirListing->public_id);
+
+        $inProgress = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+        $inProgress->forceFill([
+            'status' => 'pending',
+            'counterparty_user_id' => $buyer->id,
+        ])->save();
+
+        $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=pending')
+            ->assertOk()
+            ->assertSee($inProgress->public_id)
+            ->assertDontSee($ownListing->public_id);
+
+        $this->actingAs($buyer, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=pending')
+            ->assertOk()
+            ->assertSee($inProgress->public_id)
+            ->assertDontSee($ownListing->public_id);
+
+        $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=received')
+            ->assertOk()
+            ->assertDontSee($inProgress->public_id);
+
+        $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=sent')
+            ->assertOk()
+            ->assertDontSee($inProgress->public_id);
+
+        $done = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+        $done->forceFill(['status' => 'completed'])->save();
+
+        $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=completed')
+            ->assertOk()
+            ->assertSee('Trades you finished after both sides marked completed.')
+            ->assertSee($done->public_id);
+
+        app(TradeJoinService::class)->join($buyer, $ownListing);
+        app(TradeJoinService::class)->join($owner, $theirListing);
+
+        $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=received')
+            ->assertOk()
+            ->assertSee($ownListing->public_id)
+            ->assertDontSee($theirListing->public_id);
+
+        $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=sent')
+            ->assertOk()
+            ->assertSee("Offers you sent on someone else's trade ad")
+            ->assertSee($theirListing->public_id)
+            ->assertDontSee($ownListing->public_id)
+            ->assertDontSee('No offers waiting');
     }
 
     public function test_home_paginates_newest_first_and_keeps_filters(): void
@@ -302,24 +840,29 @@ class TradesBoardTest extends TestCase
     public function test_activity_paginates_newest_first_and_keeps_status(): void
     {
         $this->raiseTradePostLimits();
-        $user = $this->tradeUser('63', 'Active');
-        [$oldest, $newest] = $this->createNumberedListings($user, 21);
+        $owner = $this->tradeUser('63', 'ActiveOwner');
+        $buyer = $this->tradeUser('64', 'ActiveBuyer');
+        [$oldest, $newest] = $this->createNumberedListings($owner, 21);
+        $joins = app(TradeJoinService::class);
+        foreach (TradeListing::query()->orderBy('id')->get() as $listing) {
+            $joins->join($buyer, $listing);
+        }
 
-        $this->actingAs($user, 'trades')
-            ->get('http://www.sabex.lab/user/activity?status=all')
+        $this->actingAs($buyer, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=sent')
             ->assertOk()
             ->assertSee($newest->public_id)
             ->assertDontSee($oldest->public_id)
             ->assertSee('page=2', false)
-            ->assertSee('status=all', false)
+            ->assertSee('status=sent', false)
             ->assertSee('trades-pagination', false);
 
-        $this->actingAs($user, 'trades')
-            ->get('http://www.sabex.lab/user/activity?status=all&page=2')
+        $this->actingAs($buyer, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status=sent&page=2')
             ->assertOk()
             ->assertSee($oldest->public_id)
             ->assertDontSee($newest->public_id)
-            ->assertSee('status=all', false);
+            ->assertSee('status=sent', false);
     }
 
     public function test_block_prevents_join(): void
@@ -341,6 +884,7 @@ class TradesBoardTest extends TestCase
         config([
             'sab-trades.max_active_listings_per_user' => 50,
             'sab-trades.post_trade_limit_per_hour' => 50,
+            'sab-trades.join_limit_per_hour' => 50,
         ]);
     }
 
@@ -376,6 +920,22 @@ class TradesBoardTest extends TestCase
             'account_status' => TradeUser::STATUS_ACTIVE,
             'last_login_at' => now(),
         ]);
+    }
+
+    /**
+     * @param  list<array{name: string, multiplier?: float, valueMultiplier?: float}>  $traits
+     */
+    private function seedCalculatorMeta(array $traits): void
+    {
+        $path = SabRotCalculatorSyncService::calculatorMetaPath();
+        $dir = dirname($path);
+        if (! is_dir($dir)) {
+            mkdir($dir, 0777, true);
+        }
+        file_put_contents($path, json_encode([
+            'traits' => $traits,
+            'streakMultipliers' => ['3' => 2, '6' => 3],
+        ], JSON_THROW_ON_ERROR));
     }
 
     private function seedItem(string $slug, string $name, float $value): void

@@ -12,6 +12,7 @@ trait CreatesSabWikiTables
         foreach ([
             'seo_item_observations',
             'seo_item_current_values',
+            'seo_item_aliases',
             'seo_item_translations',
             'seo_item_variants',
             'seo_items',
@@ -66,6 +67,20 @@ trait CreatesSabWikiTables
             $table->text('summary')->nullable();
             $table->boolean('is_publish_html')->default(true);
             $table->boolean('is_listed')->default(true);
+            $table->boolean('is_hot')->default(false);
+            $table->string('wiki_page_status')->nullable();
+            $table->string('wiki_page_url')->nullable();
+            $table->string('wiki_page_title')->nullable();
+            $table->unsignedInteger('wiki_page_id')->nullable();
+            $table->timestamp('wiki_checked_at')->nullable();
+            $table->string('source_page_url')->nullable();
+            $table->string('purchase_url')->nullable();
+            $table->string('rarest_mutation_name')->nullable();
+            $table->integer('rarest_mutation_count')->nullable();
+            $table->string('rarest_trait_name')->nullable();
+            $table->integer('rarest_trait_count')->nullable();
+            $table->decimal('avg_rebirth', 8, 2)->nullable();
+            $table->string('supreme_value')->nullable();
             $table->integer('total_exists')->nullable();
             $table->integer('exist_estimate_low')->nullable();
             $table->integer('exist_estimate_high')->nullable();
@@ -95,7 +110,12 @@ trait CreatesSabWikiTables
             $table->string('variant_key');
             $table->string('variant_name')->nullable();
             $table->string('variant_type')->nullable();
+            $table->string('mutation')->nullable();
             $table->string('mutation_name')->nullable();
+            $table->string('trait')->nullable();
+            $table->string('trait_name')->nullable();
+            $table->decimal('exist_percentage', 8, 4)->nullable();
+            $table->decimal('multiplier', 8, 4)->nullable();
             $table->integer('sort_order')->default(0);
             $table->json('attributes_json')->nullable();
             $table->timestamps();
@@ -116,6 +136,13 @@ trait CreatesSabWikiTables
             $table->string('source_payload_hash')->nullable();
             $table->timestamps();
         });
+        Schema::create('seo_item_aliases', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('seo_item_id');
+            $table->unsignedBigInteger('seo_value_source_id');
+            $table->string('alias_name');
+            $table->timestamps();
+        });
         Schema::create('seo_item_observations', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('seo_item_variant_id');
@@ -123,12 +150,14 @@ trait CreatesSabWikiTables
             $table->unsignedBigInteger('seo_sync_run_id')->nullable();
             $table->timestamp('observed_at')->nullable();
             $table->string('exist_count_raw')->default('');
+            $table->integer('exist_count_normalized')->nullable();
             $table->string('value_raw')->nullable();
             $table->decimal('value_normalized', 16, 4)->nullable();
             $table->string('currency')->nullable();
             $table->string('demand')->nullable();
             $table->integer('confidence')->nullable();
             $table->string('source_payload_hash')->nullable();
+            $table->json('source_payload_json')->nullable();
             $table->timestamps();
         });
         Schema::create('seo_users', function (Blueprint $table): void {
@@ -150,6 +179,7 @@ trait CreatesSabWikiTables
             $table->string('locale')->default('en');
             $table->string('title')->nullable();
             $table->text('excerpt')->nullable();
+            $table->string('cover_image_url', 1000)->nullable();
             $table->text('body_html')->nullable();
             $table->string('status')->default('published');
             $table->timestamp('published_at')->nullable();

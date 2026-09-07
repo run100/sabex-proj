@@ -61,6 +61,7 @@ class SabHost
             self::host('www'),
             self::host('admin'),
             'www.sabexistcount.com',
+            'sabex.lab',
             'localhost',
             '127.0.0.1',
         ])));

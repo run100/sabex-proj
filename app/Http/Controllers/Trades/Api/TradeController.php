@@ -9,6 +9,7 @@ use App\Services\Trades\TradeConfirmationService;
 use App\Services\Trades\TradeJoinService;
 use App\Services\Trades\TradeListingService;
 use App\Services\Trades\TradeModerationService;
+use App\Services\Trades\TradeNotificationService;
 use App\Support\TradeApi;
 use App\Support\TradePresenter;
 use App\Support\TradeSchema;
@@ -121,6 +122,36 @@ class TradeController extends Controller
 
                 return TradeApi::ok(['join_request' => TradePresenter::join($row)], 201);
             });
+        } catch (TradeException $e) {
+            return TradeApi::fromException($e);
+        }
+    }
+
+    public function messages(string $ulid, TradeListingService $listings, TradeNotificationService $notifications): JsonResponse
+    {
+        $this->requireSchema();
+        try {
+            $user = auth('trades')->user();
+            $listing = $listings->findPublic($ulid);
+            $items = $notifications->thread($user, $listing)
+                ->map(fn ($row) => TradePresenter::threadMessage($row, $user))
+                ->values()
+                ->all();
+
+            return TradeApi::ok(['items' => $items]);
+        } catch (TradeException $e) {
+            return TradeApi::fromException($e);
+        }
+    }
+
+    public function sendMessage(Request $request, string $ulid, TradeListingService $listings, TradeNotificationService $notifications): JsonResponse
+    {
+        $this->requireSchema();
+        try {
+            $user = auth('trades')->user();
+            $row = $notifications->send($user, $listings->findPublic($ulid), (string) $request->input('message'));
+
+            return TradeApi::ok(['message' => TradePresenter::threadMessage($row->loadMissing('actor'), $user)], 201);
         } catch (TradeException $e) {
             return TradeApi::fromException($e);
         }

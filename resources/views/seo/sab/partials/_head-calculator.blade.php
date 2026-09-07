@@ -17,6 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="preload" href="/static/css/sabexistcount.css" as="style" />
 <link rel="preload" href="{{ $cssHref ?? \App\Services\Seo\SabRenderService::CSS_HREF_SAB_CALCULATOR }}" as="style" />
+<link rel="stylesheet" href="/static/css/sab-tokens.css" />
 <link rel="stylesheet" href="/static/css/sabexistcount.css" />
 <link rel="stylesheet" href="{{ $cssHref ?? \App\Services\Seo\SabRenderService::CSS_HREF_SAB_CALCULATOR }}" />
 

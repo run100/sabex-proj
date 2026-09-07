@@ -131,13 +131,33 @@ final class SabWikiPageDefinitions
     }
 
     /**
+     * Local preview topic pages. Routable, but not in sitemap, hub, or drawer.
+     *
+     * @return list<string>
+     */
+    public static function previewOnlyTopicPageSlugs(): array
+    {
+        return [self::PAGE_WIKI_LUCKY_BLOCKS];
+    }
+
+    /**
+     * Pages that have a public /wiki/{slug} route.
+     *
+     * @return list<string>
+     */
+    public static function routablePageSlugs(): array
+    {
+        return [...self::shippingPageSlugs(), ...self::previewOnlyTopicPageSlugs()];
+    }
+
+    /**
      * @return list<string>
      */
     public static function nestedPreviewSlugs(): array
     {
         return array_values(array_unique(array_map(
             static fn (string $slug): string => basename($slug),
-            self::newPageSlugs()
+            self::routablePageSlugs()
         )));
     }
 

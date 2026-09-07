@@ -59,6 +59,11 @@ class TradeListingItem extends Model
         return $this->belongsTo(TradeListing::class, 'listing_id');
     }
 
+    public function seoItem(): BelongsTo
+    {
+        return $this->belongsTo(SeoItem::class, 'seo_item_id');
+    }
+
     public function traits(): HasMany
     {
         return $this->hasMany(TradeListingItemTrait::class, 'listing_item_id')->orderBy('sort_order');

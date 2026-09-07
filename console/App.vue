@@ -1,7 +1,7 @@
 <template>
   <el-container class="console-shell">
     <el-aside width="220px" class="console-aside">
-      <p class="console-brand">SAB Console</p>
+      <p class="console-brand">Admin-SAB</p>
       <el-menu
         :default-active="route.path"
         :default-openeds="['trades']"
@@ -13,6 +13,10 @@
         <el-menu-item index="/items">
           <el-icon><Goods /></el-icon>
           <span>Items</span>
+        </el-menu-item>
+        <el-menu-item index="/sites">
+          <el-icon><Monitor /></el-icon>
+          <span>Sites</span>
         </el-menu-item>
         <el-menu-item index="/news">
           <el-icon><Document /></el-icon>
@@ -60,7 +64,7 @@
 </template>
 
 <script setup>
-import { Document, Goods, List, Notebook, Setting, Ticket, User } from '@element-plus/icons-vue';
+import { Document, Goods, List, Monitor, Notebook, Setting, Ticket, User } from '@element-plus/icons-vue';
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -69,6 +73,7 @@ const router = useRouter();
 const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 const titles = {
   '/items': 'Items',
+  '/sites': 'Sites',
   '/news': 'News',
   '/codes': 'Codes',
   '/users': 'Users',

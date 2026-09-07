@@ -48,7 +48,10 @@ class SabPublicController extends Controller
         if (in_array($page, SabWikiPageDefinitions::catalogPageSlugs(), true)) {
             return view('seo.sab.wiki-catalog', $sabRender->wikiCatalogViewContext($page));
         }
-        abort_unless(in_array($page, SabWikiPageDefinitions::topicPageSlugs(), true), 404);
+        abort_unless(in_array($page, [
+            ...SabWikiPageDefinitions::shippingTopicPageSlugs(),
+            ...SabWikiPageDefinitions::previewOnlyTopicPageSlugs(),
+        ], true), 404);
 
         return view('seo.sab.wiki-topic', $sabRender->wikiTopicViewContext($page));
     }

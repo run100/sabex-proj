@@ -11,6 +11,8 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class TradeNotificationService
 {
+    public const TYPE_MESSAGE = 'trade_message';
+
     public function notify(
         TradeUser $user,
         string $type,
@@ -38,6 +40,63 @@ class TradeNotificationService
             ->where('user_id', $user->id)
             ->orderByDesc('id')
             ->paginate($this->limit($limit), ['*'], 'page', $page);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, TradeNotification>
+     */
+    public function thread(TradeUser $user, TradeListing $listing)
+    {
+        return TradeNotification::query()
+            ->with('actor')
+            ->where('listing_id', $listing->id)
+            ->where('type', self::TYPE_MESSAGE)
+            ->where(function ($query) use ($user): void {
+                $query->where('user_id', $user->id)->orWhere('actor_user_id', $user->id);
+            })
+            ->orderBy('id')
+            ->get();
+    }
+
+    public function send(TradeUser $actor, TradeListing $listing, string $message): TradeNotification
+    {
+        $message = trim($message);
+        if ($message === '' || mb_strlen($message) > 280) {
+            throw TradeException::invalid('INVALID_MESSAGE', 'Enter a message up to 280 characters.');
+        }
+        $recipient = $this->recipient($actor, $listing);
+        if ((int) $recipient->id === (int) $actor->id) {
+            throw TradeException::invalid('INVALID_MESSAGE', 'You cannot message yourself.');
+        }
+
+        return $this->notify($recipient, self::TYPE_MESSAGE, 'New trade message', $message, $listing, null, $actor);
+    }
+
+    private function recipient(TradeUser $actor, TradeListing $listing): TradeUser
+    {
+        if ((int) $actor->id !== (int) $listing->owner_user_id) {
+            $owner = $listing->owner;
+            if ($owner === null) {
+                throw TradeException::notFound();
+            }
+
+            return $owner;
+        }
+
+        $last = TradeNotification::query()
+            ->with('actor')
+            ->where('listing_id', $listing->id)
+            ->where('type', self::TYPE_MESSAGE)
+            ->where('user_id', $actor->id)
+            ->whereNotNull('actor_user_id')
+            ->where('actor_user_id', '!=', $actor->id)
+            ->orderByDesc('id')
+            ->first();
+        if ($last?->actor) {
+            return $last->actor;
+        }
+
+        throw TradeException::invalid('INVALID_MESSAGE', 'No visitor to reply to yet.');
     }
 
     public function unreadCount(TradeUser $user): int
