@@ -196,13 +196,26 @@ class TradesBoardTest extends TestCase
         $styles = file_get_contents(public_path('static/css/sab-trades.css'));
         $this->assertIsString($styles);
         $this->assertMatchesRegularExpression(
-            '/body\.trades-app \.trades-show__arrow \{(?:(?!\}).)*width: 2\.5rem;(?:(?!\}).)*height: 2\.5rem;/s',
+            '/body\.trades-app \.trades-show__arrow \{(?:(?!\}).)*width: 2\.5rem;/s',
             $styles
         );
         $this->assertMatchesRegularExpression(
             '/body\.trades-app \.trades-show__arrow img \{(?:(?!\}).)*width: 2\.5rem;(?:(?!\}).)*height: 2\.5rem;/s',
             $styles
         );
+        $this->assertMatchesRegularExpression(
+            '/body\.trades-app \.trades-show__boards \{(?:(?!\}).)*position: relative;/s',
+            $styles
+        );
+        $this->assertMatchesRegularExpression(
+            '/@media \(min-width: 900px\) \{.*?body\.trades-app \.trades-show__boards \{(?:(?!\}).)*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\);(?:(?!\}).)*gap: 6px;/s',
+            $styles
+        );
+        $this->assertMatchesRegularExpression(
+            '/@media \(min-width: 900px\) \{.*?body\.trades-app \.trades-show__arrow \{(?:(?!\}).)*position: absolute;(?:(?!\}).)*top: 50%;(?:(?!\}).)*left: 50%;(?:(?!\}).)*height: 2\.5rem;(?:(?!\}).)*transform: translate\(-50%, -50%\);/s',
+            $styles
+        );
+        $this->assertStringContainsString('pointer-events: none;', $styles);
 
         preg_match('/<title>(.*?)<\/title>/s', $html, $match);
         $documentTitle = trim(html_entity_decode(strip_tags($match[1] ?? ''), ENT_QUOTES));
