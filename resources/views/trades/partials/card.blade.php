@@ -75,7 +75,10 @@
     @foreach($sides as $index => $side)
       @if($index === 1)
         <div class="trades-card-board__arrow" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M3.8 7.15h11.05l-1.85-1.85a.95.95 0 0 1 1.35-1.35l3.5 3.5c.37.37.37.98 0 1.35l-3.5 3.5a.95.95 0 1 1-1.35-1.35l1.85-1.85H3.8a.95.95 0 0 1 0-1.9Z"/>
+            <path d="M20.2 16.85H9.15l1.85 1.85a.95.95 0 1 1-1.35 1.35l-3.5-3.5a.95.95 0 0 1 0-1.35l3.5-3.5a.95.95 0 1 1 1.35 1.35l-1.85 1.85H20.2a.95.95 0 0 1 0 1.9Z"/>
+          </svg>
         </div>
       @endif
       @php

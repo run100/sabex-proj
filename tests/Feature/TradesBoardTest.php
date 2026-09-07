@@ -71,6 +71,7 @@ class TradesBoardTest extends TestCase
         $this->assertSame(0, substr_count($html, 'trades-item-slot--empty'));
         $this->assertSame(2, substr_count($html, 'trades-item-slot--filled'));
         $this->assertStringContainsString('trades-card-board__arrow', $html);
+        $this->assertStringContainsString('M3.8 7.15h11.05', $html);
         $this->assertStringContainsString('trades-item-slot__mut', $html);
         $this->assertStringNotContainsString('trades-card-board__flag', $html);
 

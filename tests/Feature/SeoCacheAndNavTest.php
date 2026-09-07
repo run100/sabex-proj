@@ -1,0 +1,229 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\SeoGame;
+use App\Models\SeoItem;
+use App\Models\SeoSite;
+use App\Models\TradeUser;
+use App\Services\Seo\SabRenderService;
+use Tests\Concerns\CreatesSabWikiTables;
+use Tests\Concerns\CreatesTradeTables;
+use Tests\TestCase;
+
+class SeoCacheAndNavTest extends TestCase
+{
+    use CreatesSabWikiTables;
+    use CreatesTradeTables;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['sab.hosts.www' => 'www.sabex.lab']);
+        $this->createSeoTables();
+        $this->createTradeTables();
+        SeoSite::query()->create([
+            'slug' => SabRenderService::SITE_SLUG,
+            'name' => 'SAB',
+            'domain' => 'sabexistcount.com',
+            'base_url' => 'https://sabexistcount.com',
+            'output_path' => '',
+            'settings_json' => [],
+        ]);
+        SeoGame::query()->create([
+            'seo_site_id' => 1,
+            'slug' => 'steal-a-brainrot',
+            'name' => 'Steal a Brainrot',
+        ]);
+        SeoItem::query()->create([
+            'seo_game_id' => 1,
+            'slug' => 'cache-nav-item',
+            'name' => 'Cache Nav Item',
+            'rarity' => 'Common',
+            'description' => '',
+            'summary' => '',
+            'is_publish_html' => true,
+            'is_listed' => true,
+            'image_url' => '',
+            'local_image_url' => '',
+            'avg_coins_raw' => '',
+            'attributes_json' => [],
+            'sort_order' => 0,
+        ]);
+    }
+
+    public function test_seo_pages_are_cdn_cacheable_and_omit_session_cookies(): void
+    {
+        foreach (['/', '/wiki', '/products/cache-nav-item'] as $path) {
+            $response = $this->get('http://www.sabex.lab'.$path);
+            $response->assertOk();
+            $this->assertStringContainsString('s-maxage=14400', (string) $response->headers->get('Cache-Control'));
+            $this->assertSame('max-age=14400', $response->headers->get('Cloudflare-CDN-Cache-Control'));
+            $this->assertSame('Accept-Encoding', $response->headers->get('Vary'));
+            $this->assertFalse($response->headers->has('Set-Cookie'));
+            $response->assertSee('/static/js/sab-nav-auth.js', false);
+            $response->assertSee('data-nav-auth', false);
+            $response->assertSee('data-nav-sign-in', false);
+            $response->assertSee('data-roblox-auth-modal', false);
+            $response->assertDontSee('name="csrf-token"', false);
+            $response->assertDontSee('_token', false);
+        }
+    }
+
+    public function test_logged_in_seo_html_stays_anonymous(): void
+    {
+        $user = TradeUser::query()->create([
+            'roblox_sub' => '88001',
+            'roblox_user_id' => '88001',
+            'username' => 'cachenavuserxyz',
+            'display_name' => 'CacheNavUserXYZ',
+            'avatar_url' => '',
+            'account_status' => TradeUser::STATUS_ACTIVE,
+            'last_login_at' => now(),
+        ]);
+
+        $home = $this->actingAs($user, 'trades')->get('http://www.sabex.lab/');
+        $home->assertOk();
+        $this->assertPrivateNoStore($home);
+        $home->assertDontSee('CacheNavUserXYZ');
+        $home->assertDontSee('cachenavuserxyz');
+        $home->assertSee('data-nav-sign-in', false);
+
+        $wiki = $this->actingAs($user, 'trades')->get('http://www.sabex.lab/wiki');
+        $wiki->assertOk();
+        $wiki->assertDontSee('CacheNavUserXYZ');
+        $wiki->assertSee('/static/js/sab-nav-auth.js', false);
+    }
+
+    public function test_home_and_trading_share_full_header_nav_and_language_switch(): void
+    {
+        foreach (['/', '/trading'] as $path) {
+            $this->get('http://www.sabex.lab'.$path)
+                ->assertOk()
+                ->assertSee('sab-site-header', false)
+                ->assertSee('sab-wiki-drawer-trigger', false)
+                ->assertSee('SAB<span class="sab-brand-accent">ExistCount</span>.com', false)
+                ->assertSee('color: #67e8f9', false)
+                ->assertSee('/static/css/sab-tokens.css', false)
+                ->assertSee('sab-main-nav', false)
+                ->assertSee('sab-bottom-nav', false)
+                ->assertSee('sab-bottom-nav__item', false)
+                ->assertSee('Values')
+                ->assertSee('Trades')
+                ->assertSee('Calculator')
+                ->assertSee('Guides')
+                ->assertSee('News')
+                ->assertSee('Home')
+                ->assertSee('More')
+                ->assertSee('Codes')
+                ->assertSee('Exist Count Gallery')
+                ->assertSee(SabRenderService::PAGE_CODES, false)
+                ->assertSee(SabRenderService::PAGE_EXIST_COUNT_GALLERY, false)
+                ->assertSee(SabRenderService::PAGE_VALUE_LIST, false)
+                ->assertSee('/wiki', false)
+                ->assertSee('data-sab-language-switch', false)
+                ->assertSee('value="/pt"', false)
+                ->assertSee('>PT</option>', false)
+                ->assertSee('>Create Trade Ad</span>', false)
+                ->assertSee('>View Trade Ads</span>', false)
+                ->assertDontSee('>Post</span>', false)
+                ->assertDontSee('>Activity</span>', false);
+        }
+
+        $navJs = (string) file_get_contents(public_path('static/js/sab-nav-auth.js'));
+        $this->assertStringNotContainsString('hideTradesNavExtras', $navJs);
+        $this->assertSame(1, preg_match('/function renderHeader[\s\S]+function renderDrawer/', $navJs, $headerFn));
+        $this->assertStringContainsString("icon('bell')", $headerFn[0]);
+        $this->assertStringContainsString('aria-label="Alerts"', $headerFn[0]);
+        $this->assertStringNotContainsString('Sign out', $headerFn[0]);
+        $this->assertStringNotContainsString('sab-nav-auth__name', $headerFn[0]);
+        $this->assertSame(1, preg_match('/function renderDrawer[\s\S]+function renderBar/', $navJs, $drawerFn));
+        $this->assertStringNotContainsString("'Account'", $drawerFn[0]);
+    }
+
+    public function test_trading_and_me_are_private_no_store(): void
+    {
+        $trading = $this->get('http://www.sabex.lab/trading')
+            ->assertOk()
+            ->assertSee('/static/js/sab-nav-auth.js', false)
+            ->assertSee('data-nav-sign-in', false)
+            ->assertSee('No matching trades yet.');
+        $this->assertPrivateNoStore($trading);
+
+        $me = $this->getJson('http://www.sabex.lab/api/v1/me')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user', null)
+            ->assertJsonPath('data.unread_count', 0);
+        $this->assertPrivateNoStore($me);
+    }
+
+    public function test_local_pages_show_email_login_in_shared_modal(): void
+    {
+        $this->app['env'] = 'local';
+
+        foreach (['/', '/steal-a-brainrot-trading-calculator', '/trading/new', '/auth/roblox'] as $path) {
+            $this->get('http://www.sabex.lab'.$path)
+                ->assertOk()
+                ->assertSee('data-roblox-auth-modal', false)
+                ->assertSee('Configure Roblox OAuth')
+                ->assertSee('Continue with Roblox')
+                ->assertSee('border: 1px solid rgba(148, 163, 184, 0.4)')
+                ->assertSee('Email login')
+                ->assertSee('Create an account')
+                ->assertSee('>Login</a>', false);
+        }
+    }
+
+    public function test_calculator_only_header_uses_shared_modal(): void
+    {
+        $html = view('seo.sab.partials._header', [
+            'locale' => 'en',
+            'urlPrefix' => '',
+            't' => [],
+            'calculatorOnly' => true,
+            'brand' => ['logo_html' => 'SAB<span class="sab-brand-accent">Calculator</span>.com'],
+            'languageLinks' => [],
+        ])->render();
+
+        $this->assertStringContainsString('data-roblox-auth-modal', $html);
+        $this->assertStringContainsString('Calculator', $html);
+        $this->assertStringContainsString('>Login</a>', $html);
+        $this->assertStringNotContainsString('name="csrf-token"', $html);
+        $this->assertStringNotContainsString('_token', $html);
+    }
+
+    public function test_calculator_layout_includes_shared_header_and_modal(): void
+    {
+        $html = view('seo.sab.layout-calculator', [
+            'locale' => 'en',
+            'seoTitle' => 'Calculator',
+            'seoDescription' => 'Compare trades',
+            'canonical' => 'http://www.sabex.lab/',
+            'urlPrefix' => '',
+            't' => [],
+            'calculatorOnly' => true,
+            'brand' => [
+                'logo_html' => 'SABCalculator',
+                'og_site_name' => 'SAB Calculator',
+                'site_name' => 'SAB Calculator',
+            ],
+            'hreflangLinks' => [],
+            'languageLinks' => [],
+            'cssHref' => '/static/css/sabcalculator.css',
+        ])->render();
+
+        $this->assertStringContainsString('data-roblox-auth-modal', $html);
+        $this->assertStringContainsString('data-nav-sign-in', $html);
+        $this->assertStringContainsString('/static/js/sab-nav-auth.js', $html);
+        $this->assertStringContainsString('sab-wiki-drawer', $html);
+        $this->assertStringContainsString('sab-bottom-nav', $html);
+    }
+
+    private function assertPrivateNoStore($response): void
+    {
+        $cacheControl = strtolower((string) $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('private', $cacheControl);
+        $this->assertStringContainsString('no-store', $cacheControl);
+    }
+}

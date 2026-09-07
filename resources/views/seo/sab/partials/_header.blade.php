@@ -99,14 +99,14 @@
     min-height: 68px;
   }
   .sab-site-header__logo {
-    color: var(--sab-text, #f8fafc);
+    color: #f8fafc;
     font-size: 1.25rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
+    font-weight: 900;
+    letter-spacing: -0.025em;
     text-decoration: none;
   }
   .sab-brand-accent {
-    color: var(--sab-blue-light, #60a5fa);
+    color: #67e8f9;
   }
   .sab-site-header__brand {
     display: flex;
@@ -214,7 +214,7 @@
     line-height: 1.2;
   }
   .sab-wiki-drawer-trigger {
-    display: none;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 2.25rem;
@@ -253,8 +253,8 @@
     border-bottom-color: var(--sab-blue, #3b82f6);
   }
   @media (min-width: 768px) {
-    .sab-wiki-drawer-trigger {
-      display: inline-flex;
+    .sab-site-header__logo {
+      font-size: 1.5rem;
     }
     .sab-main-nav {
       display: flex;
