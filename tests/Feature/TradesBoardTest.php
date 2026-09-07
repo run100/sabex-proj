@@ -72,6 +72,7 @@ class TradesBoardTest extends TestCase
         $this->assertSame(2, substr_count($html, 'trades-item-slot--filled'));
         $this->assertStringContainsString('trades-card-board__arrow', $html);
         $this->assertStringContainsString('M3.8 7.15h11.05', $html);
+        $this->assertStringContainsString('rotate(90 12 12)', $html);
         $this->assertStringContainsString('trades-item-slot__mut', $html);
         $this->assertStringNotContainsString('trades-card-board__flag', $html);
 
@@ -155,6 +156,8 @@ class TradesBoardTest extends TestCase
             ->assertSee('Share Trade')
             ->assertSee("They're offering")
             ->assertSee("They're looking for")
+            ->assertSee('/static/img/trades-transfer.png', false)
+            ->assertSee('trades-show__grid--3', false)
             ->assertSee('Make Offer')
             ->assertSee('Message')
             ->assertSee('Home')
@@ -183,7 +186,25 @@ class TradesBoardTest extends TestCase
             ->assertDontSee('Posted By')
             ->assertDontSee('Accepted By');
 
-        preg_match('/<title>(.*?)<\/title>/s', $page->getContent(), $match);
+        $html = $page->getContent();
+        preg_match('/<div class="trades-show__arrow"[^>]*>(.*?)<\/div>/s', $html, $arrowMatch);
+        $arrowHtml = $arrowMatch[1] ?? '';
+        $this->assertStringContainsString('/static/img/trades-transfer.png', $arrowHtml);
+        $this->assertStringNotContainsString('<svg', $arrowHtml);
+        $this->assertStringNotContainsString('rotate(90 12 12)', $arrowHtml);
+
+        $styles = file_get_contents(public_path('static/css/sab-trades.css'));
+        $this->assertIsString($styles);
+        $this->assertMatchesRegularExpression(
+            '/body\.trades-app \.trades-show__arrow \{(?:(?!\}).)*width: 2\.5rem;(?:(?!\}).)*height: 2\.5rem;/s',
+            $styles
+        );
+        $this->assertMatchesRegularExpression(
+            '/body\.trades-app \.trades-show__arrow img \{(?:(?!\}).)*width: 2\.5rem;(?:(?!\}).)*height: 2\.5rem;/s',
+            $styles
+        );
+
+        preg_match('/<title>(.*?)<\/title>/s', $html, $match);
         $documentTitle = trim(html_entity_decode(strip_tags($match[1] ?? ''), ENT_QUOTES));
         $this->assertLessThanOrEqual(60, mb_strlen($documentTitle));
         $this->assertStringStartsWith('Trading ', $documentTitle);

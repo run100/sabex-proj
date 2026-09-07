@@ -106,7 +106,10 @@
         @endif
       </span>
       <span class="trades-show__swap" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h11l-3-3M17 16H6l3 3"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M3.8 7.15h11.05l-1.85-1.85a.95.95 0 0 1 1.35-1.35l3.5 3.5c.37.37.37.98 0 1.35l-3.5 3.5a.95.95 0 1 1-1.35-1.35l1.85-1.85H3.8a.95.95 0 0 1 0-1.9Z"/>
+          <path d="M20.2 16.85H9.15L11 18.7a.95.95 0 1 1-1.35 1.35l-3.5-3.5a.95.95 0 0 1 0-1.35l3.5-3.5a.95.95 0 1 1 1.35 1.35l-1.85 1.85H20.2a.95.95 0 0 1 0 1.9Z"/>
+        </svg>
       </span>
       <span class="trades-show__look">
         @foreach($h1Looking as $index => $token)
@@ -300,7 +303,7 @@
     ] as $index => $side)
       @if($index === 1)
         <div class="trades-show__arrow" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 6l6 6-6 6"/></svg>
+          <img src="/static/img/trades-transfer.png" alt="" aria-hidden="true">
         </div>
       @endif
       <section class="trades-show__panel trades-show__panel--{{ $side['icon'] }}">
@@ -332,7 +335,7 @@
           </span>
         </div>
         <div class="trades-show__well">
-          <div class="trades-show__grid trades-show__grid--{{ min(4, max(1, $side['items']->count())) }}">
+          <div class="trades-show__grid trades-show__grid--{{ min(3, max(1, $side['items']->count())) }}">
             @foreach($side['items'] as $item)
               @include('trades.partials.show-item', ['item' => $item, 'mutationColors' => $mutationColors])
             @endforeach
@@ -484,7 +487,7 @@
             <span><em>Demand</em> <strong>{{ \App\Support\TradePresenter::sideDemand($side['items']) }}</strong></span>
           </div>
           <div class="trades-show__well">
-            <div class="trades-show__grid trades-show__grid--{{ min(4, max(1, $side['items']->count())) }}">
+            <div class="trades-show__grid trades-show__grid--{{ min(3, max(1, $side['items']->count())) }}">
               @foreach($side['items'] as $item)
                 @include('trades.partials.show-item', ['item' => $item, 'mutationColors' => $mutationColors])
               @endforeach

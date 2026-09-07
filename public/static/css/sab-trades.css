@@ -2055,17 +2055,17 @@ body.trades-app .trades-show__swap {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
   border-radius: 50%;
-  background: #0f172a;
+  background: #0b1628;
   color: #67e8f9;
 }
 
 body.trades-app .trades-show__swap svg {
-  width: 1rem;
-  height: 1rem;
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
 body.trades-app .trades-show__lead {
@@ -2268,21 +2268,22 @@ body.trades-app .trades-show__boards {
 }
 
 body.trades-app .trades-show__arrow {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  margin: 2.4rem auto 0;
-  border: 1px solid rgba(148, 163, 184, 0.28);
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: -2px auto;
+  border: 0;
   border-radius: 50%;
-  background: #0f172a;
-  color: #67e8f9;
+  background: transparent;
 }
 
-body.trades-app .trades-show__arrow svg {
-  width: 1.1rem;
-  height: 1.1rem;
+body.trades-app .trades-show__arrow img {
+  display: block;
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: contain;
 }
 
 body.trades-app .trades-show__panel {
@@ -2403,20 +2404,26 @@ body.trades-app .trades-show__well {
 
 body.trades-app .trades-show__grid {
   display: grid;
-  grid-template-columns: repeat(2, max-content);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.65rem;
   justify-content: start;
 }
 
 body.trades-app .trades-show__grid--1 {
-  grid-template-columns: max-content;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body.trades-app .trades-show__grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 body.trades-app .trades-show__item {
   position: relative;
   display: flex;
-  width: var(--trades-item-art);
-  box-sizing: content-box;
+  width: 100%;
+  max-width: 8rem;
+  min-width: 0;
+  box-sizing: border-box;
   flex-direction: column;
   align-items: stretch;
   padding: 0;
@@ -2431,7 +2438,7 @@ body.trades-app .trades-show__item {
 body.trades-app .trades-show__art {
   position: relative;
   display: block;
-  width: var(--trades-item-art);
+  width: 100%;
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 0.65rem;
@@ -2440,8 +2447,8 @@ body.trades-app .trades-show__art {
 body.trades-app .trades-show__item img,
 body.trades-app .trades-show__item-name {
   display: block;
-  width: var(--trades-item-art);
-  height: var(--trades-item-art);
+  width: 100%;
+  height: auto;
   aspect-ratio: 1;
   object-fit: contain;
 }
@@ -2752,14 +2759,11 @@ body.trades-app .trades-show__text-btn:hover {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     gap: 0.75rem;
   }
+}
 
-  body.trades-app .trades-show__arrow {
-    display: flex;
-  }
-
-  body.trades-app .trades-show__grid--3,
-  body.trades-app .trades-show__grid--4 {
-    grid-template-columns: repeat(2, max-content);
+@media (max-width: 899px) {
+  body.trades-app .trades-show__arrow img {
+    transform: rotate(90deg);
   }
 }
 
