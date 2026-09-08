@@ -21,7 +21,7 @@
     @endif
   </div>
 </div>
-<dl class="mb-8 grid grid-cols-3 gap-3 text-sm">
+<dl class="trades-profile-stats text-sm">
   <div class="rounded-lg bg-slate-900/70 p-3"><dt class="text-slate-500">Posted</dt><dd class="text-xl font-black">{{ $stats['trades_posted'] }}</dd></div>
   <div class="rounded-lg bg-slate-900/70 p-3"><dt class="text-slate-500">Accepted</dt><dd class="text-xl font-black">{{ $stats['trades_accepted'] }}</dd></div>
   <div class="rounded-lg bg-slate-900/70 p-3"><dt class="text-slate-500">Completed</dt><dd class="text-xl font-black">{{ $stats['trades_completed'] }}</dd></div>

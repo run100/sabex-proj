@@ -112,6 +112,13 @@ body.trades-app .trades-card {
   padding: 1.5rem;
 }
 
+body.trades-app .trades-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 2rem;
+}
+
 body.trades-app .trades-btn,
 body.trades-app button.bg-cyan-700,
 body.trades-app a.bg-cyan-700,
@@ -1114,6 +1121,19 @@ body.trades-app .trades-home-actions {
   align-items: center;
   justify-content: flex-start;
   gap: 12px;
+}
+
+body.trades-app .trades-home-actions__row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+body.trades-app .trades-home-actions__row .trades-btn {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 8px;
 }
 
 @media (max-width: 767px) {
@@ -2704,14 +2724,39 @@ body.trades-app .trades-show__step-detail strong {
   font-weight: 800;
 }
 
+body.trades-app .trades-show__joins {
+  padding: 0.65rem 0.85rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 1rem;
+  background: #0f172a;
+}
+
+body.trades-app .trades-show__joins h2 {
+  margin: 0 0 0.4rem;
+  color: #f8fafc;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 body.trades-app .trades-show__join {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  padding: 0.65rem 0;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  gap: 0.45rem 0.55rem;
+  padding: 0.35rem 0;
+}
+
+body.trades-app .trades-show__join:last-child {
+  padding-bottom: 0;
+}
+
+body.trades-app .trades-show__join-copy {
+  min-width: 0;
+  flex: 1 1 8rem;
+}
+
+body.trades-app .trades-show__join-copy p {
+  margin: 0;
 }
 
 body.trades-app .trades-show__join a {
@@ -2724,12 +2769,20 @@ body.trades-app .trades-show__join span,
 body.trades-app .trades-show__join p,
 body.trades-app .trades-show__empty {
   color: #94a3b8;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 }
 
 body.trades-app .trades-show__join-actions {
   display: flex;
-  gap: 0.4rem;
+  flex: 0 0 auto;
+  gap: 0.35rem;
+}
+
+body.trades-app .trades-show__joins .trades-show__offer-btn,
+body.trades-app .trades-show__joins .trades-show__ghost {
+  min-height: 1.9rem;
+  padding: 0 0.7rem;
+  font-size: 0.8rem;
 }
 
 body.trades-app .trades-show__block label {

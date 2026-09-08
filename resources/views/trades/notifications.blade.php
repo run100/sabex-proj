@@ -7,13 +7,19 @@
 </div>
 <div class="space-y-3">
   @forelse($notifications as $row)
-    <article class="rounded-xl border border-white/10 bg-slate-900/70 p-4 {{ $row->is_read ? 'opacity-70' : '' }}">
-      <p class="font-bold">{{ $row->title }}</p>
-      <p class="text-sm text-slate-400">{{ $row->message }}</p>
-      <p class="mt-1 text-xs text-slate-500">{{ optional($row->created_at)->diffForHumans() }}</p>
-      @if($row->listing)
-        <a class="text-sm text-cyan-300" href="/trading/{{ $row->listing->public_id }}">View trade</a>
+    <article class="flex gap-3 rounded-xl border border-white/10 bg-slate-900/70 p-4 {{ $row->is_read ? 'opacity-70' : '' }}">
+      @if($row->actor)
+        @include('trades.partials.avatar', ['url' => $row->actor->avatar_url, 'size' => 28])
       @endif
+      <div class="min-w-0">
+        <p class="font-bold">{{ $row->title }}</p>
+        <p class="text-sm text-slate-400">{{ $row->message }}</p>
+        <p class="mt-1 text-xs text-slate-500">{{ optional($row->created_at)->diffForHumans() }}</p>
+        @if($row->listing)
+          <p class="mt-1 text-xs text-slate-500">Trade ID: #{{ $row->listing->public_id }}</p>
+          <a class="text-sm text-cyan-300" href="/trading/{{ $row->listing->public_id }}">View trade</a>
+        @endif
+      </div>
     </article>
   @empty
     <p class="text-slate-500">No notifications.</p>

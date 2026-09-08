@@ -35,6 +35,13 @@
   }
 </style>
 
+<nav class="trades-show__back" aria-label="Breadcrumb">
+  <a href="/">Home</a>
+  <span class="trades-show__back-sep" aria-hidden="true">›</span>
+  <a href="{{ \App\Support\TradePaths::marketplace() }}">All Trades</a>
+  <span class="trades-show__back-sep" aria-hidden="true">›</span>
+  <span class="trades-show__back-current">Create Trade Ad</span>
+</nav>
 <section
   class="trades-create"
   data-calculator-root

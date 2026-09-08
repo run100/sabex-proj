@@ -160,7 +160,7 @@ class TradesBoardTest extends TestCase
             ->assertSee("They're looking for")
             ->assertSee('/static/img/trades-transfer.png', false)
             ->assertSee('trades-show__grid--3', false)
-            ->assertSee('Make Offer')
+            ->assertSee('Join To Trade')
             ->assertSee('Message')
             ->assertSee('Home')
             ->assertSee('All Trades')
@@ -179,6 +179,9 @@ class TradesBoardTest extends TestCase
             ->assertSee('trades-show__mut', false)
             ->assertSee($listing->public_id)
             ->assertSee('/auth/roblox?return_to='.rawurlencode('/trading/'.$listing->public_id), false)
+            ->assertSee('data-nav-sign-in', false)
+            ->assertSee('data-roblox-auth-modal', false)
+            ->assertSee('Continue with Roblox')
             ->assertDontSee('Quick replies')
             ->assertDontSee('Cancel listing')
             ->assertDontSee('trades-view-btn', false)
@@ -296,7 +299,7 @@ class TradesBoardTest extends TestCase
         $visitor = $this->actingAs($buyer, 'trades')
             ->get('http://www.sabex.lab/trading/'.$listing->public_id)
             ->assertOk()
-            ->assertSee('Make Offer')
+            ->assertSee('Join To Trade')
             ->assertSee('Message')
             ->assertSee('data-message-open', false)
             ->assertSee('data-offer-open', false)
@@ -323,13 +326,14 @@ class TradesBoardTest extends TestCase
             ->get('http://www.sabex.lab/trading/'.$listing->public_id)
             ->assertOk()
             ->assertSee('Cancel listing')
-            ->assertSee('Message')
-            ->assertSee('data-message-open', false)
-            ->assertSee('Quick replies')
-            ->assertDontSee('Make Offer')
+            ->assertDontSee('data-message-open', false)
+            ->assertDontSee('Quick replies')
+            ->assertDontSee('Join To Trade')
             ->assertDontSee('data-offer-open', false)
             ->assertDontSee('Send an offer')
-            ->assertDontSee('Submit report');
+            ->assertDontSee('Submit report')
+            ->assertDontSee('Join requests')
+            ->assertDontSee('No join requests yet.');
     }
 
     public function test_send_offer_keeps_listing_open_and_owner_can_accept_or_reject(): void
@@ -353,7 +357,7 @@ class TradesBoardTest extends TestCase
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'JOIN_ALREADY_EXISTS');
 
-        $this->actingAs($owner, 'trades')
+        $page = $this->actingAs($owner, 'trades')
             ->get('http://www.sabex.lab/trading/'.$listing->public_id)
             ->assertOk()
             ->assertSee('Join requests')
@@ -365,12 +369,25 @@ class TradesBoardTest extends TestCase
             ->assertSee("Hi! I have the items you're looking for.")
             ->assertDontSee('Posted By')
             ->assertDontSee('Accepted By')
-            ->assertDontSee('trades-show__badge--pending', false);
+            ->assertDontSee('trades-show__badge--pending', false)
+            ->assertDontSee('No join requests yet.');
+
+        $html = $page->getContent();
+        $userbarPos = strpos($html, 'trades-show__userbar');
+        $joinsPos = strpos($html, 'Join requests');
+        $offeringPos = strpos($html, 'trades-show__boards');
+        $this->assertNotFalse($userbarPos);
+        $this->assertNotFalse($joinsPos);
+        $this->assertNotFalse($offeringPos);
+        $this->assertGreaterThan($userbarPos, $joinsPos);
+        $this->assertGreaterThan($joinsPos, $offeringPos);
+        preg_match('/<section class="trades-show__joins"[^>]*>(.*?)<\/section>/s', $html, $joinsMatch);
+        $this->assertStringContainsString('trades-avatar', $joinsMatch[1] ?? '');
 
         $this->actingAs($buyer, 'trades')
             ->get('http://www.sabex.lab/trading/'.$listing->public_id)
             ->assertOk()
-            ->assertSee('Make Offer')
+            ->assertSee('Join To Trade')
             ->assertSee('trades-show__badge--open', false)
             ->assertSee('Share Trade')
             ->assertDontSee('Posted By')
@@ -409,12 +426,49 @@ class TradesBoardTest extends TestCase
             ->assertSee('Mark Completed')
             ->assertSee('Mark Failed')
             ->assertDontSee('Join requests')
-            ->assertDontSee('Make Offer');
+            ->assertDontSee('Join To Trade')
+            ->assertSee('data-message-open', false)
+            ->assertSee('data-peer-name="AcceptedBuyer"', false)
+            ->assertDontSee('Visitor');
 
         $html = $page->getContent();
         $this->assertStringContainsString('trades-show__badge--pending', $html);
         $this->assertStringNotContainsString('trades-show__badge">', $html);
         $this->assertStringNotContainsString('join-requests/', $html);
+    }
+
+    public function test_owner_can_message_accepted_counterparty(): void
+    {
+        $owner = $this->tradeUser('55532', 'OwnerPeer');
+        $buyer = $this->tradeUser('55533', 'BuyerPeer');
+        $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+
+        $this->actingAs($buyer, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/join')
+            ->assertCreated();
+
+        $joinId = $this->actingAs($owner, 'trades')
+            ->getJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/join-requests')
+            ->assertOk()
+            ->json('data.items.0.public_id');
+
+        $this->actingAs($owner, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/join-requests/'.$joinId.'/accept')
+            ->assertOk();
+
+        $this->actingAs($owner, 'trades')
+            ->get('http://www.sabex.lab/trading/'.$listing->public_id)
+            ->assertOk()
+            ->assertSee('data-message-open', false)
+            ->assertSee('data-peer-name="BuyerPeer"', false);
+
+        $this->actingAs($owner, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/messages', [
+                'message' => "I'm ready to trade!",
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.message.message', "I'm ready to trade!")
+            ->assertJsonPath('data.message.mine', true);
     }
 
     public function test_trade_messages_use_notifications_and_block_self_send(): void
@@ -464,7 +518,10 @@ class TradesBoardTest extends TestCase
         $this->actingAs($owner, 'trades')
             ->get('http://www.sabex.lab/notifications')
             ->assertOk()
-            ->assertSee("I'm ready to trade!");
+            ->assertSee("I'm ready to trade!")
+            ->assertSee('Trade ID:')
+            ->assertSee('#'.$listing->public_id)
+            ->assertSee('trades-avatar', false);
 
         $this->assertSame(2, TradeNotification::query()->where('listing_id', $listing->id)->where('type', 'trade_message')->count());
         $this->assertSame(1, TradeNotification::query()->where('user_id', $owner->id)->where('type', 'trade_message')->count());
@@ -716,7 +773,7 @@ class TradesBoardTest extends TestCase
 
         $profilePage = $this->get('http://www.sabex.lab/profile/'.$user->profile_id)
             ->assertOk()
-            ->assertSee('grid-cols-3', false);
+            ->assertSee('trades-profile-stats', false);
         preg_match('/<nav class="trades-show__back"[^>]*>(.*?)<\/nav>/s', $profilePage->getContent(), $profileMatch);
         $profileBreadcrumb = $profileMatch[1] ?? '';
         $this->assertStringContainsString('href="/"', $profileBreadcrumb);

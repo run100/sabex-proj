@@ -177,6 +177,8 @@ class TradeLaunchGuardTest extends TestCase
             ->assertSee('Post a Steal a Brainrot trade ad on SABExistCount. Add I Have and I Want items with mutations and traits, compare SAB values, income, exist counts, and W/F/L, then publish. Finish the swap in Roblox.', false)
             ->assertSee('mutations and traits')
             ->assertSee('W/F/L')
+            ->assertSee('trades-show__back', false)
+            ->assertSee('All Trades')
             ->assertSee('Create Trade Ad')
             ->assertSee('I Have')
             ->assertSee('I Want')

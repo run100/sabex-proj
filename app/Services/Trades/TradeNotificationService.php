@@ -36,7 +36,7 @@ class TradeNotificationService
     public function forUser(TradeUser $user, int $page = 1, int $limit = 20): LengthAwarePaginator
     {
         return TradeNotification::query()
-            ->with('listing')
+            ->with(['listing', 'actor'])
             ->where('user_id', $user->id)
             ->orderByDesc('id')
             ->paginate($this->limit($limit), ['*'], 'page', $page);
@@ -72,15 +72,15 @@ class TradeNotificationService
         return $this->notify($recipient, self::TYPE_MESSAGE, 'New trade message', $message, $listing, null, $actor);
     }
 
-    private function recipient(TradeUser $actor, TradeListing $listing): TradeUser
+    public function peer(TradeUser $actor, TradeListing $listing): ?TradeUser
     {
         if ((int) $actor->id !== (int) $listing->owner_user_id) {
-            $owner = $listing->owner;
-            if ($owner === null) {
-                throw TradeException::notFound();
-            }
+            return $listing->owner;
+        }
 
-            return $owner;
+        $counterparty = $listing->counterparty;
+        if ($counterparty && (int) $counterparty->id !== (int) $actor->id) {
+            return $counterparty;
         }
 
         $last = TradeNotification::query()
@@ -92,11 +92,22 @@ class TradeNotificationService
             ->where('actor_user_id', '!=', $actor->id)
             ->orderByDesc('id')
             ->first();
-        if ($last?->actor) {
-            return $last->actor;
+
+        return $last?->actor;
+    }
+
+    private function recipient(TradeUser $actor, TradeListing $listing): TradeUser
+    {
+        $peer = $this->peer($actor, $listing);
+        if ($peer === null) {
+            if ((int) $actor->id !== (int) $listing->owner_user_id) {
+                throw TradeException::notFound();
+            }
+
+            throw TradeException::invalid('INVALID_MESSAGE', 'No visitor to reply to yet.');
         }
 
-        throw TradeException::invalid('INVALID_MESSAGE', 'No visitor to reply to yet.');
+        return $peer;
     }
 
     public function unreadCount(TradeUser $user): int

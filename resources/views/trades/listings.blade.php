@@ -5,7 +5,13 @@
   $wantBrainrot = $wantBrainrot ?? null;
   $haveBrainrot = $haveBrainrot ?? null;
   $filterOpen = $wantBrainrot || $haveBrainrot;
+  $guest = ! ($tradeUser ?? $user ?? null);
 @endphp
+<nav class="trades-show__back" aria-label="Breadcrumb">
+  <a href="/">Home</a>
+  <span class="trades-show__back-sep" aria-hidden="true">›</span>
+  <span class="trades-show__back-current">All Trades</span>
+</nav>
 <section class="trades-home-hero">
   <h1>Steal a Brainrot Trades</h1>
   <p class="trades-home-hero__lead">Browse live Steal a Brainrot trades, compare SAB values, and find players looking for the items you have.</p>
@@ -14,18 +20,20 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
       Post a Trade
     </a>
-    <a href="{{ \App\Support\TradePaths::offers() }}" class="trades-btn trades-btn-ghost">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h3l2-6 4 12 2-6h7"/></svg>
-      Offers
-    </a>
-    <a href="/{{ \App\Services\Seo\SabRenderService::PAGE_TRADING_CALCULATOR }}" class="trades-btn trades-btn-ghost">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></svg>
-      Value Calculator
-    </a>
-    <a href="/{{ \App\Services\Seo\SabRenderService::PAGE_VALUE_LIST }}" class="trades-btn trades-btn-ghost">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>
-      Value List
-    </a>
+    <div class="trades-home-actions__row">
+      <a href="{{ \App\Support\TradePaths::offers() }}" class="trades-btn trades-btn-ghost"@if($guest) data-nav-sign-in @endif>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h3l2-6 4 12 2-6h7"/></svg>
+        Offers
+      </a>
+      <a href="/{{ \App\Services\Seo\SabRenderService::PAGE_TRADING_CALCULATOR }}" class="trades-btn trades-btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></svg>
+        Value Calculator
+      </a>
+      <a href="/{{ \App\Services\Seo\SabRenderService::PAGE_VALUE_LIST }}" class="trades-btn trades-btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>
+        Value List
+      </a>
+    </div>
   </div>
   <p class="trades-home-note">Community listings only. SAB Exist Count is not official Roblox, does not hold items, and does not complete trades. Finish exchanges in Roblox.</p>
 </section>

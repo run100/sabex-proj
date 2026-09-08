@@ -26,8 +26,10 @@
   $waitName = $isOwner ? $counterpartyName : $ownerName;
   $loginHref = \App\Support\TradePaths::robloxLogin('/trading/'.$listing->public_id);
   $messageUrl = '/api/v1/trading/trades/'.$listing->public_id.'/messages';
-  $peerName = $isOwner ? 'Visitor' : $ownerName;
-  $peerAvatar = $isOwner ? '' : (string) ($listing->owner?->avatar_url ?? '');
+  $messagePeer = $messagePeer ?? null;
+  $canMessage = $user && $messagePeer && (int) $messagePeer->id !== (int) $user->id;
+  $peerName = $messagePeer?->display_name ?: $messagePeer?->username ?: 'Trader';
+  $peerAvatar = (string) ($messagePeer?->avatar_url ?? '');
   $quickReplies = [
     "I'm ready to trade!",
     'Join me!',
@@ -189,13 +191,13 @@
       </div>
       </div>
       <div class="trades-show__cta">
-      @if($user)
+      @if($canMessage)
         <button type="button" class="trades-show__ghost" data-message-open>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a8.5 8.5 0 0 1-12.4 7.5L3 21l1.6-5A8.5 8.5 0 1 1 21 12Z"/></svg>
           Message
         </button>
-      @else
-        <a class="trades-show__ghost" href="{{ $loginHref }}">
+      @elseif(! $user)
+        <a class="trades-show__ghost" href="{{ $loginHref }}" data-nav-sign-in>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a8.5 8.5 0 0 1-12.4 7.5L3 21l1.6-5A8.5 8.5 0 1 1 21 12Z"/></svg>
           Message
         </a>
@@ -207,12 +209,12 @@
       @if($canSendOffer)
         <button type="button" class="trades-show__offer-btn" data-offer-open>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h11l-3-3M17 16H6l3 3"/></svg>
-          Make Offer
+          Join To Trade
         </button>
       @elseif($listing->isOpen() && !$user)
-        <a class="trades-show__offer-btn" href="{{ $loginHref }}">
+        <a class="trades-show__offer-btn" href="{{ $loginHref }}" data-nav-sign-in>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h11l-3-3M17 16H6l3 3"/></svg>
-          Make Offer
+          Join To Trade
         </a>
       @elseif($isOwner && $listing->isOpen())
         <form method="post" action="/api/v1/trading/trades/{{ $listing->public_id }}/cancel" data-json-form>
@@ -242,6 +244,31 @@
     </div>
     </div>
   </div>
+  @if($isOwner && $listing->isOpen() && count($joinRequests) > 0)
+  <section class="trades-show__joins">
+    <h2>Join requests</h2>
+    @foreach($joinRequests as $join)
+      <div class="trades-show__join">
+        @include('trades.partials.avatar', ['url' => $join->requester?->avatar_url, 'size' => 28])
+        <div class="trades-show__join-copy">
+          <p>
+            <a href="{{ $join->requester?->profilePath() ?? '#' }}">{{ $join->requester?->display_name ?: $join->requester?->username }}</a>
+            <span>requested</span>
+          </p>
+          @if($join->note)
+            <p>{{ $join->note }}</p>
+          @endif
+        </div>
+        @if($join->isActive())
+          <div class="trades-show__join-actions">
+            <form method="post" action="/api/v1/trading/join-requests/{{ $join->public_id }}/accept" data-json-form>@csrf<button class="trades-show__offer-btn" type="submit">Accept</button></form>
+            <form method="post" action="/api/v1/trading/join-requests/{{ $join->public_id }}/reject" data-json-form>@csrf<button class="trades-show__ghost" type="submit">Reject</button></form>
+          </div>
+        @endif
+      </div>
+    @endforeach
+  </section>
+  @endif
   <p class="trades-show__status" data-form-status></p>
 
   @if($counterparty)
@@ -345,29 +372,6 @@
     @endforeach
   </div>
 
-  @if($isOwner && $listing->isOpen())
-  <section class="trades-show__block">
-    <h2>Join requests</h2>
-    @forelse($joinRequests as $join)
-      <div class="trades-show__join">
-        <div>
-          <a href="{{ $join->requester?->profilePath() ?? '#' }}">{{ $join->requester?->display_name ?: $join->requester?->username }}</a>
-          <span>{{ $join->status }}</span>
-          @if($join->note)<p>{{ $join->note }}</p>@endif
-        </div>
-        @if($join->isActive())
-          <div class="trades-show__join-actions">
-            <form method="post" action="/api/v1/trading/join-requests/{{ $join->public_id }}/accept" data-json-form>@csrf<button class="trades-show__offer-btn" type="submit">Accept</button></form>
-            <form method="post" action="/api/v1/trading/join-requests/{{ $join->public_id }}/reject" data-json-form>@csrf<button class="trades-show__ghost" type="submit">Reject</button></form>
-          </div>
-        @endif
-      </div>
-    @empty
-      <p class="trades-show__empty">No join requests yet.</p>
-    @endforelse
-  </section>
-  @endif
-
   {{-- Report UI and POST /api/v1/reports are disabled. --}}
   @if(false && $user)
   <section class="trades-show__block">
@@ -425,7 +429,7 @@
   </section>
 </section>
 
-@if($user)
+@if($canMessage)
 <div class="trades-msg" hidden data-message-modal data-messages-url="{{ $messageUrl }}" data-peer-name="{{ $peerName }}" data-peer-avatar="{{ $peerAvatar }}">
   <div class="trades-msg__dialog" role="dialog" aria-modal="true" aria-labelledby="trades-msg-name">
     <header class="trades-msg__head">
@@ -542,6 +546,7 @@
     });
   });
 
+@if($canMessage)
   (function () {
     const modal = document.querySelector('[data-message-modal]');
     if (!modal) return;
@@ -549,7 +554,6 @@
     const form = modal.querySelector('[data-message-form]');
     const input = modal.querySelector('[data-message-input]');
     const error = modal.querySelector('[data-message-error]');
-    const peerName = modal.querySelector('[data-message-peer-name]');
     const url = modal.getAttribute('data-messages-url');
 
     function setOpen(open) {
@@ -570,10 +574,6 @@
       thread.innerHTML = (items || []).map((item) => (
         '<p class="trades-msg__bubble' + (item.mine ? ' is-mine' : '') + '">' + escapeHtml(item.message) + '</p>'
       )).join('');
-      const other = (items || []).find((item) => !item.mine && item.actor && (item.actor.display_name || item.actor.username));
-      if (other && peerName && modal.getAttribute('data-peer-name') === 'Visitor') {
-        peerName.textContent = other.actor.display_name || other.actor.username;
-      }
       thread.scrollTop = thread.scrollHeight;
     }
 
@@ -629,6 +629,7 @@
       sendMessage(input.value);
     });
   })();
+@endif
 
 @if($canSendOffer)
   (function () {
