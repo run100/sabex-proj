@@ -71,8 +71,10 @@ class TradesBoardTest extends TestCase
         $this->assertSame(0, substr_count($html, 'trades-item-slot--empty'));
         $this->assertSame(2, substr_count($html, 'trades-item-slot--filled'));
         $this->assertStringContainsString('trades-card-board__arrow', $html);
-        $this->assertStringContainsString('M3.8 7.15h11.05', $html);
-        $this->assertStringContainsString('rotate(90 12 12)', $html);
+        preg_match('/<div class="trades-card-board__arrow"[^>]*>(.*?)<\/div>/s', $html, $cardArrowMatch);
+        $cardArrowHtml = $cardArrowMatch[1] ?? '';
+        $this->assertStringContainsString('/static/img/trades-transfer.png', $cardArrowHtml);
+        $this->assertStringNotContainsString('<svg', $cardArrowHtml);
         $this->assertStringContainsString('trades-item-slot__mut', $html);
         $this->assertStringNotContainsString('trades-card-board__flag', $html);
 
@@ -204,17 +206,43 @@ class TradesBoardTest extends TestCase
             $styles
         );
         $this->assertMatchesRegularExpression(
-            '/body\.trades-app \.trades-show__boards \{(?:(?!\}).)*position: relative;/s',
+            '/body\.trades-app \.trades-show__boards \{(?:(?!\}).)*position: relative;(?:(?!\}).)*gap: 4px;/s',
             $styles
         );
         $this->assertMatchesRegularExpression(
-            '/@media \(min-width: 900px\) \{.*?body\.trades-app \.trades-show__boards \{(?:(?!\}).)*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\);(?:(?!\}).)*gap: 6px;/s',
+            '/body\.trades-app \.trades-card-board__sides \{(?:(?!\}).)*position: relative;(?:(?!\}).)*gap: 4px;/s',
             $styles
         );
         $this->assertMatchesRegularExpression(
-            '/@media \(min-width: 900px\) \{.*?body\.trades-app \.trades-show__arrow \{(?:(?!\}).)*position: absolute;(?:(?!\}).)*top: 50%;(?:(?!\}).)*left: 50%;(?:(?!\}).)*height: 2\.5rem;(?:(?!\}).)*transform: translate\(-50%, -50%\);/s',
+            '/body\.trades-app \.trades-card-board__arrow img \{(?:(?!\}).)*flex: 0 0 2\.5rem;(?:(?!\}).)*width: 2\.5rem;(?:(?!\}).)*height: 2\.5rem;/s',
             $styles
         );
+        $this->assertMatchesRegularExpression(
+            '/body\.trades-app \.trades-item-grid \{(?:(?!\}).)*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/s',
+            $styles
+        );
+        $this->assertMatchesRegularExpression(
+            '/body\.trades-app \.sab-bottom-nav \{\s*display: none;\s*\}/s',
+            $styles
+        );
+        $this->assertMatchesRegularExpression(
+            '/@media \(max-width: 767px\) \{\s*body\.trades-app \{(?:(?!\}).)*padding-bottom: 0;(?:(?!\}).)*\}/s',
+            $styles
+        );
+        $this->assertMatchesRegularExpression(
+            '/@media \(min-width: 900px\) \{.*?body\.trades-app \.trades-show__boards,\s+body\.trades-app \.trades-card-board__sides \{(?:(?!\}).)*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\);(?:(?!\}).)*gap: 8px;/s',
+            $styles
+        );
+        $this->assertMatchesRegularExpression(
+            '/@media \(min-width: 900px\) \{.*?body\.trades-app \.trades-show__arrow,\s+body\.trades-app \.trades-card-board__arrow \{(?:(?!\}).)*position: absolute;(?:(?!\}).)*top: 50%;(?:(?!\}).)*left: 50%;(?:(?!\}).)*width: 8rem;(?:(?!\}).)*height: 8rem;(?:(?!\}).)*transform: translate\(-50%, -50%\);/s',
+            $styles
+        );
+        $this->assertMatchesRegularExpression(
+            '/@media \(min-width: 900px\) \{.*?body\.trades-app \.trades-show__arrow img,\s+body\.trades-app \.trades-card-board__arrow img \{(?:(?!\}).)*flex: 0 0 8rem;(?:(?!\}).)*width: 8rem;(?:(?!\}).)*height: 8rem;/s',
+            $styles
+        );
+        $this->assertStringContainsString('body.trades-app .trades-card-board__arrow', $styles);
+        $this->assertStringContainsString('body.trades-app .trades-card-board__arrow img', $styles);
         $this->assertStringContainsString('pointer-events: none;', $styles);
 
         preg_match('/<title>(.*?)<\/title>/s', $html, $match);
@@ -682,6 +710,42 @@ class TradesBoardTest extends TestCase
             ->assertDontSee('trades-filter__panel is-open', false);
     }
 
+    public function test_profile_and_offers_breadcrumbs_follow_profile_visibility(): void
+    {
+        $user = $this->tradeUser('50', 'BreadcrumbUser');
+
+        $profilePage = $this->get('http://www.sabex.lab/profile/'.$user->profile_id)
+            ->assertOk()
+            ->assertSee('grid-cols-3', false);
+        preg_match('/<nav class="trades-show__back"[^>]*>(.*?)<\/nav>/s', $profilePage->getContent(), $profileMatch);
+        $profileBreadcrumb = $profileMatch[1] ?? '';
+        $this->assertStringContainsString('href="/"', $profileBreadcrumb);
+        $this->assertStringContainsString('>Profile</span>', $profileBreadcrumb);
+        $this->assertStringContainsString('trades-show__back-current">BreadcrumbUser</span>', $profileBreadcrumb);
+        $this->assertStringNotContainsString('All Trades', $profileBreadcrumb);
+
+        $offersPage = $this->actingAs($user, 'trades')
+            ->get('http://www.sabex.lab/user/offers')
+            ->assertOk();
+        preg_match('/<nav class="trades-show__back"[^>]*>(.*?)<\/nav>/s', $offersPage->getContent(), $offersMatch);
+        $offersBreadcrumb = $offersMatch[1] ?? '';
+        $this->assertStringContainsString('href="'.$user->profilePath().'"', $offersBreadcrumb);
+        $this->assertStringContainsString("BreadcrumbUser's Profile", html_entity_decode($offersBreadcrumb, ENT_QUOTES, 'UTF-8'));
+        $this->assertStringContainsString('trades-show__back-current">Offers</span>', $offersBreadcrumb);
+
+        $user->profile_visibility = TradeUser::VISIBILITY_PRIVATE;
+        $user->save();
+
+        $privateOffersPage = $this->actingAs($user->fresh(), 'trades')
+            ->get('http://www.sabex.lab/user/offers')
+            ->assertOk();
+        preg_match('/<nav class="trades-show__back"[^>]*>(.*?)<\/nav>/s', $privateOffersPage->getContent(), $privateOffersMatch);
+        $privateOffersBreadcrumb = $privateOffersMatch[1] ?? '';
+        $this->assertStringContainsString('href="/user"', $privateOffersBreadcrumb);
+        $this->assertStringContainsString('Your Account', $privateOffersBreadcrumb);
+        $this->assertStringNotContainsString($user->profilePath(), $privateOffersBreadcrumb);
+    }
+
     public function test_activity_page_copy_requires_login(): void
     {
         $this->get('http://www.sabex.lab/user/offers')
@@ -709,7 +773,8 @@ class TradesBoardTest extends TestCase
             ->assertDontSee('href="/user/offers?status=all"', false)
             ->assertDontSee('<h1>Steal a Brainrot Trade Activity</h1>', false)
             ->assertSee('Home')
-            ->assertSee('All Trades')
+            ->assertSee("Watcher's Profile")
+            ->assertSee('href="'.$user->profilePath().'"', false)
             ->assertSee('Value Calculator')
             ->assertSee('Value List')
             ->assertSee('href="/steal-a-brainrot-trading-calculator"', false)

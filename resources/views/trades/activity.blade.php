@@ -5,11 +5,15 @@
   $status = $status ?? 'received';
   $tabCopy = $tabCopy ?? [];
   $currentCopy = (string) ($tabCopy[$status] ?? $tabCopy['received'] ?? '');
+  $breadcrumbParent = $breadcrumbParent ?? [
+    'href' => \App\Support\TradePaths::account(),
+    'label' => 'Your Account',
+  ];
 @endphp
 <nav class="trades-show__back" aria-label="Breadcrumb">
   <a href="/">Home</a>
   <span class="trades-show__back-sep" aria-hidden="true">›</span>
-  <a href="{{ \App\Support\TradePaths::marketplace() }}">All Trades</a>
+  <a href="{{ $breadcrumbParent['href'] }}">{{ $breadcrumbParent['label'] }}</a>
   <span class="trades-show__back-sep" aria-hidden="true">›</span>
   <span class="trades-show__back-current">Offers</span>
 </nav>

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Trades;
 
 use App\Http\Controllers\Controller;
+use App\Models\TradeUser;
 use App\Services\Trades\TradeActivityService;
 use App\Support\TradeCanonical;
 use App\Support\TradePaths;
+use App\Support\TradeProfileAccess;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -20,7 +22,18 @@ class ActivityController extends Controller
         if (! in_array($status, ['ads', 'received', 'sent', 'pending', 'completed', 'expired'], true)) {
             $status = 'received';
         }
+        /** @var TradeUser $user */
         $user = auth('trades')->user();
+        $profileName = $user->display_name ?: $user->username;
+        $breadcrumbParent = TradeProfileAccess::canAccessProfile($user)
+            ? [
+                'href' => $user->profilePath(),
+                'label' => $profileName."'s Profile",
+            ]
+            : [
+                'href' => TradePaths::account(),
+                'label' => 'Your Account',
+            ];
         $tabCopy = [
             'ads' => 'Trade ads you posted. Open one to manage it or wait for offers.',
             'received' => 'Accept or decline offers on your trade ads before a chat is opened.',
@@ -37,6 +50,7 @@ class ActivityController extends Controller
             'robots' => 'noindex,nofollow',
             'status' => $status,
             'tabCopy' => $tabCopy,
+            'breadcrumbParent' => $breadcrumbParent,
             'counts' => $activity->countsForUser($user),
             'listings' => $activity->forUser($user, $status, (int) $request->query('page', 1)),
         ]));
