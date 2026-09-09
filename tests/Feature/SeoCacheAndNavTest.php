@@ -87,10 +87,7 @@ class SeoCacheAndNavTest extends TestCase
         foreach ($paths as $path) {
             $response = $this->get('http://www.sabex.lab'.$path);
             $response->assertOk();
-            $this->assertStringContainsString('s-maxage=14400', (string) $response->headers->get('Cache-Control'));
-            $this->assertSame('max-age=14400', $response->headers->get('Cloudflare-CDN-Cache-Control'));
-            $this->assertSame('Accept-Encoding', $response->headers->get('Vary'));
-            $this->assertFalse($response->headers->has('Set-Cookie'));
+            $this->assertPublicSeoCdn($response);
             $response->assertSee('/static/js/sab-nav-auth.js', false);
             $response->assertSee('data-nav-auth', false);
             $response->assertSee('data-nav-sign-in', false);
@@ -118,15 +115,32 @@ class SeoCacheAndNavTest extends TestCase
 
         $home = $this->actingAs($user, 'trades')->get('http://www.sabex.lab/');
         $home->assertOk();
-        $this->assertPrivateNoStore($home);
+        $this->assertPublicSeoCdn($home);
         $home->assertDontSee('CacheNavUserXYZ');
         $home->assertDontSee('cachenavuserxyz');
         $home->assertSee('data-nav-sign-in', false);
+        $home->assertSee('/static/js/sab-nav-auth.js', false);
 
         $wiki = $this->actingAs($user, 'trades')->get('http://www.sabex.lab/wiki');
         $wiki->assertOk();
+        $this->assertPublicSeoCdn($wiki);
         $wiki->assertDontSee('CacheNavUserXYZ');
         $wiki->assertSee('/static/js/sab-nav-auth.js', false);
+    }
+
+    public function test_calculator_stays_cdn_cacheable_when_session_cookie_is_present(): void
+    {
+        $sessionCookie = (string) config('session.cookie');
+        $this->assertNotSame('', $sessionCookie);
+
+        $response = $this->withCookie($sessionCookie, 'seo-cdn-session')
+            ->get('http://www.sabex.lab/steal-a-brainrot-trading-calculator');
+        $response->assertOk();
+        $this->assertPublicSeoCdn($response);
+        $response->assertDontSee('name="csrf-token"', false);
+        $response->assertDontSee('_token', false);
+        $this->assertCalculatorBuilderOmitsCsrf($response->getContent());
+        $response->assertSee('/static/js/sab-nav-auth.js', false);
     }
 
     public function test_home_and_trading_share_full_header_nav_and_language_switch(): void
@@ -183,6 +197,7 @@ class SeoCacheAndNavTest extends TestCase
         }
 
         $navJs = (string) file_get_contents(public_path('static/js/sab-nav-auth.js'));
+        $this->assertStringContainsString("var ME_URL = '/api/v1/me'", $navJs);
         $this->assertStringNotContainsString('hideTradesNavExtras', $navJs);
         $this->assertSame(1, preg_match('/function renderHeader[\s\S]+function renderDrawer/', $navJs, $headerFn));
         $this->assertStringContainsString("icon('bell')", $headerFn[0]);
@@ -291,6 +306,14 @@ class SeoCacheAndNavTest extends TestCase
         $this->assertStringContainsString('/static/js/sab-nav-auth.js', $html);
         $this->assertStringContainsString('sab-wiki-drawer', $html);
         $this->assertStringContainsString('sab-bottom-nav', $html);
+    }
+
+    private function assertPublicSeoCdn($response): void
+    {
+        $this->assertStringContainsString('s-maxage=14400', (string) $response->headers->get('Cache-Control'));
+        $this->assertSame('max-age=14400', $response->headers->get('Cloudflare-CDN-Cache-Control'));
+        $this->assertSame('Accept-Encoding', $response->headers->get('Vary'));
+        $this->assertFalse($response->headers->has('Set-Cookie'));
     }
 
     private function assertPrivateNoStore($response): void

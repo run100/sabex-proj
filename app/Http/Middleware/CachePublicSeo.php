@@ -14,12 +14,6 @@ class CachePublicSeo
     {
         $response = $next($request);
 
-        if ($this->mustNotCache($request)) {
-            $response->headers->set('Cache-Control', 'private, no-store');
-
-            return $response;
-        }
-
         if ($response->getStatusCode() !== 200) {
             return $response;
         }
@@ -30,16 +24,5 @@ class CachePublicSeo
         $response->headers->remove('Set-Cookie');
 
         return $response;
-    }
-
-    private function mustNotCache(Request $request): bool
-    {
-        if (auth('trades')->check()) {
-            return true;
-        }
-
-        $sessionCookie = (string) config('session.cookie');
-
-        return $sessionCookie !== '' && $request->cookies->has($sessionCookie);
     }
 }
