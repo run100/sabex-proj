@@ -245,6 +245,7 @@ CREATE TABLE IF NOT EXISTS `seo_trade_notifications` (
   PRIMARY KEY (`id`),
   KEY `idx_trade_notifications_user_read` (`user_id`, `is_read`, `created_at`),
   KEY `idx_trade_notifications_listing` (`listing_id`),
+  KEY `idx_trade_notifications_message_pair` (`actor_user_id`, `user_id`, `type`),
   CONSTRAINT `fk_trade_notification_user`
     FOREIGN KEY (`user_id`) REFERENCES `seo_trade_users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_trade_notification_listing`

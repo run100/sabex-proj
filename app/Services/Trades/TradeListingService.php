@@ -378,8 +378,8 @@ class TradeListingService
         }
 
         return $query
-            ->orderByRaw("CASE WHEN is_top = 'Y' THEN 1 ELSE 0 END DESC")
-            ->orderByRaw("CASE WHEN is_hot = 'Y' THEN 1 ELSE 0 END DESC")
+            ->orderByDesc('is_top')
+            ->orderByDesc('is_hot')
             ->orderByDesc('sort_order');
     }
 

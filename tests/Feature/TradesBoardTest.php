@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\TradeException;
 use App\Models\SeoItem;
 use App\Models\TradeEvent;
 use App\Models\TradeListing;
@@ -11,6 +12,7 @@ use App\Models\TradeUser;
 use App\Services\Seo\SabRotCalculatorSyncService;
 use App\Services\Trades\TradeJoinService;
 use App\Services\Trades\TradeListingService;
+use App\Services\Trades\TradeNotificationService;
 use App\Support\TradeSeo;
 use Tests\Concerns\CreatesSabWikiTables;
 use Tests\Concerns\CreatesTradeTables;
@@ -530,6 +532,9 @@ class TradesBoardTest extends TestCase
         $this->actingAs($buyer, 'trades')
             ->getJson($url)
             ->assertOk()
+            ->assertJsonPath('data.message_quota.limit', 2)
+            ->assertJsonPath('data.message_quota.sent', 1)
+            ->assertJsonPath('data.message_quota.remaining', 1)
             ->assertJsonPath('data.items.0.message', "I'm ready to trade!")
             ->assertJsonPath('data.items.0.mine', true);
 
@@ -561,6 +566,133 @@ class TradesBoardTest extends TestCase
         $this->assertSame(2, TradeNotification::query()->where('listing_id', $listing->id)->where('type', 'trade_message')->count());
         $this->assertSame(1, TradeNotification::query()->where('user_id', $owner->id)->where('type', 'trade_message')->count());
         $this->assertSame(1, TradeNotification::query()->where('user_id', $buyer->id)->where('type', 'trade_message')->count());
+    }
+
+    public function test_trade_messages_reject_markup_and_enforce_global_directional_limit(): void
+    {
+        $owner = $this->tradeUser('55506', 'MessageOwner');
+        $buyer = $this->tradeUser('55507', 'MessageBuyer');
+        $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+        $url = 'http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/messages';
+
+        foreach (['<script></script>', "<script>alert('1')</script>", '<div>blocked</div>', '<!-- blocked -->'] as $message) {
+            $this->actingAs($buyer, 'trades')
+                ->postJson($url, ['message' => $message])
+                ->assertStatus(422)
+                ->assertJsonPath('error.code', 'INVALID_MESSAGE');
+        }
+        $this->assertSame(0, TradeNotification::query()->where('listing_id', $listing->id)->where('type', 'trade_message')->count());
+
+        foreach (['First message', 'Second message'] as $message) {
+            $this->actingAs($buyer, 'trades')
+                ->postJson($url, ['message' => $message])
+                ->assertCreated();
+        }
+
+        $this->actingAs($buyer, 'trades')
+            ->getJson($url)
+            ->assertOk()
+            ->assertJsonPath('data.message_quota.limit', 2)
+            ->assertJsonPath('data.message_quota.sent', 2)
+            ->assertJsonPath('data.message_quota.remaining', 0);
+
+        $this->actingAs($buyer, 'trades')
+            ->postJson($url, ['message' => 'Third message'])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'MESSAGE_LIMIT_REACHED');
+
+        $otherListing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+        $otherUrl = 'http://www.sabex.lab/api/v1/trading/trades/'.$otherListing->public_id.'/messages';
+        $this->actingAs($buyer, 'trades')
+            ->postJson($otherUrl, ['message' => 'Another trade'])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'MESSAGE_LIMIT_REACHED');
+
+        $this->assertSame(2, TradeNotification::query()
+            ->where('type', TradeNotificationService::TYPE_MESSAGE)
+            ->where('actor_user_id', $buyer->id)
+            ->where('user_id', $owner->id)
+            ->count());
+
+        foreach (['Reply one', 'Reply two'] as $message) {
+            $this->actingAs($owner, 'trades')
+                ->postJson($url, ['message' => $message])
+                ->assertCreated();
+        }
+
+        $this->actingAs($owner, 'trades')
+            ->postJson($url, ['message' => 'Reply three'])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'MESSAGE_LIMIT_REACHED');
+
+        $this->assertSame(2, TradeNotification::query()
+            ->where('type', TradeNotificationService::TYPE_MESSAGE)
+            ->where('actor_user_id', $owner->id)
+            ->where('user_id', $buyer->id)
+            ->count());
+    }
+
+    public function test_trade_messages_allow_literal_angle_text_without_markup(): void
+    {
+        $owner = $this->tradeUser('55508', 'AngleOwner');
+        $buyer = $this->tradeUser('55509', 'AngleBuyer');
+        $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+        $url = 'http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/messages';
+
+        foreach (['<3', '2 < 3'] as $message) {
+            $this->actingAs($buyer, 'trades')
+                ->postJson($url, ['message' => $message])
+                ->assertCreated()
+                ->assertJsonPath('data.message.message', $message);
+        }
+    }
+
+    public function test_public_trade_inputs_treat_sql_payloads_as_values(): void
+    {
+        $owner = $this->tradeUser('55511', 'SqlOwner');
+        $buyer = $this->tradeUser('55512', 'SqlBuyer');
+        $older = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+        $newer = app(TradeListingService::class)->create($buyer, [['slug' => 'cappuccino']], [['slug' => 'noobini']]);
+        $older->created_at = now()->subMinute();
+        $older->save();
+        $newer->created_at = now();
+        $newer->save();
+
+        $injection = "' OR 1=1 UNION SELECT NULL --";
+        $sortInjection = 'created_at desc, (select 1)';
+
+        $this->getJson('http://www.sabex.lab/api/v1/brainrots/search?q='.rawurlencode($injection))
+            ->assertOk()
+            ->assertJsonPath('data.items', []);
+
+        $this->getJson('http://www.sabex.lab/api/v1/trading/trades?sort='.rawurlencode($sortInjection)
+            .'&page='.rawurlencode('1 OR 1=1')
+            .'&limit='.rawurlencode('20 OR 1=1'))
+            ->assertOk()
+            ->assertJsonPath('data.items.0.public_id', $newer->public_id);
+
+        $this->getJson('http://www.sabex.lab/api/v1/trading/trades/completed?username='.rawurlencode($injection)
+            .'&roblox_sub='.rawurlencode('; DROP TABLE seo_trade_users; --'))
+            ->assertOk()
+            ->assertJsonPath('data.items', []);
+
+        $submitter = $this->tradeUser('55513', 'SqlSubmitter');
+        $this->actingAs($submitter, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades', [
+                'offering' => [['slug' => 'noobini']],
+                'looking_for' => [['slug' => 'cappuccino']],
+                'note' => $injection,
+            ])
+            ->assertCreated();
+
+        $submitted = TradeListing::query()->where('owner_user_id', $submitter->id)->latest('id')->firstOrFail();
+        $this->assertSame($injection, $submitted->note);
+
+        $messageUrl = 'http://www.sabex.lab/api/v1/trading/trades/'.$older->public_id.'/messages';
+        $this->actingAs($buyer, 'trades')
+            ->postJson($messageUrl, ['message' => '; DROP TABLE seo_trade_notifications; --'])
+            ->assertCreated()
+            ->assertJsonPath('data.message.message', '; DROP TABLE seo_trade_notifications; --');
     }
 
     public function test_unknown_trait_is_rejected_and_not_stored(): void
@@ -596,7 +728,7 @@ class TradesBoardTest extends TestCase
     public function test_service_requires_both_sides(): void
     {
         $user = $this->tradeUser('9', 'x');
-        $this->expectException(\App\Exceptions\TradeException::class);
+        $this->expectException(TradeException::class);
         app(TradeListingService::class)->create($user, [], [['slug' => 'noobini']]);
     }
 

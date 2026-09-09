@@ -181,6 +181,7 @@ trait CreatesTradeTables
             $table->boolean('is_read')->default(false);
             $table->timestamp('read_at')->nullable();
             $table->timestamp('created_at')->nullable();
+            $table->index(['actor_user_id', 'user_id', 'type'], 'idx_trade_notifications_message_pair');
         });
         Schema::create('seo_trade_reports', function (Blueprint $table): void {
             $table->id();

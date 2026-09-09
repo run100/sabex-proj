@@ -8,6 +8,8 @@ use App\Models\TradeListing;
 use App\Models\TradeNotification;
 use App\Models\TradeUser;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class TradeNotificationService
 {
@@ -43,7 +45,7 @@ class TradeNotificationService
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, TradeNotification>
+     * @return Collection<int, TradeNotification>
      */
     public function thread(TradeUser $user, TradeListing $listing)
     {
@@ -64,12 +66,46 @@ class TradeNotificationService
         if ($message === '' || mb_strlen($message) > 280) {
             throw TradeException::invalid('INVALID_MESSAGE', 'Enter a message up to 280 characters.');
         }
+        if ($this->containsMarkup($message)) {
+            throw TradeException::invalid('INVALID_MESSAGE', 'HTML/XML tags are not allowed.');
+        }
         $recipient = $this->recipient($actor, $listing);
         if ((int) $recipient->id === (int) $actor->id) {
             throw TradeException::invalid('INVALID_MESSAGE', 'You cannot message yourself.');
         }
 
-        return $this->notify($recipient, self::TYPE_MESSAGE, 'New trade message', $message, $listing, null, $actor);
+        return DB::transaction(function () use ($actor, $listing, $message, $recipient): TradeNotification {
+            TradeUser::query()
+                ->whereIn('id', [(int) $actor->id, (int) $recipient->id])
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            $quota = $this->messageQuota($actor, $recipient);
+            if ($quota['remaining'] < 1) {
+                throw TradeException::conflict(
+                    'MESSAGE_LIMIT_REACHED',
+                    'You can send at most '.$quota['limit'].' messages to this user.'
+                );
+            }
+
+            return $this->notify($recipient, self::TYPE_MESSAGE, 'New trade message', $message, $listing, null, $actor);
+        });
+    }
+
+    /**
+     * @return array{limit: int, sent: int, remaining: int}
+     */
+    public function messageQuota(TradeUser $actor, TradeUser $recipient): array
+    {
+        $limit = max(0, (int) config('sab-trades.message_limit_per_user', 2));
+        $sent = $this->outboundMessageQuery($actor, $recipient)->count();
+
+        return [
+            'limit' => $limit,
+            'sent' => $sent,
+            'remaining' => max(0, $limit - $sent),
+        ];
     }
 
     public function peer(TradeUser $actor, TradeListing $listing): ?TradeUser
@@ -108,6 +144,22 @@ class TradeNotificationService
         }
 
         return $peer;
+    }
+
+    private function containsMarkup(string $message): bool
+    {
+        return preg_match(
+            '/<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?\s*\/?>|<!--[\s\S]*?(?:-->|$)|<![A-Za-z][^>]*>|<\?[A-Za-z][^>]*\?>|<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?$/i',
+            $message
+        ) === 1;
+    }
+
+    private function outboundMessageQuery(TradeUser $actor, TradeUser $recipient)
+    {
+        return TradeNotification::query()
+            ->where('type', self::TYPE_MESSAGE)
+            ->where('actor_user_id', $actor->id)
+            ->where('user_id', $recipient->id);
     }
 
     public function unreadCount(TradeUser $user): int

@@ -555,6 +555,7 @@
     const input = modal.querySelector('[data-message-input]');
     const error = modal.querySelector('[data-message-error]');
     const url = modal.getAttribute('data-messages-url');
+    let messageQuota = null;
 
     function setOpen(open) {
       modal.hidden = !open;
@@ -568,6 +569,23 @@
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+    }
+
+    function containsMarkup(value) {
+      return /<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?\s*\/?>|<!--[\s\S]*?(?:-->|$)|<![A-Za-z][^>]*>|<\?[A-Za-z][^>]*\?>|<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?$/i.test(value);
+    }
+
+    function updateMessageQuota(quota) {
+      messageQuota = quota && typeof quota === 'object' ? quota : null;
+      const exhausted = messageQuota && Number(messageQuota.remaining) < 1;
+      input.disabled = Boolean(exhausted);
+      modal.querySelector('.trades-msg__send').disabled = Boolean(exhausted);
+      modal.querySelectorAll('[data-quick-reply]').forEach((button) => {
+        button.disabled = Boolean(exhausted);
+      });
+      if (exhausted) {
+        error.textContent = 'You can send at most 2 messages to this user.';
+      }
     }
 
     function renderItems(items) {
@@ -585,12 +603,21 @@
         error.textContent = payload.error?.message || 'Could not load messages.';
         return;
       }
+      updateMessageQuota(payload.data?.message_quota);
       renderItems(payload.data?.items || []);
     }
 
     async function sendMessage(text) {
       const message = String(text || '').trim();
       if (!message) return;
+      if (containsMarkup(message)) {
+        error.textContent = 'HTML/XML tags are not allowed.';
+        return;
+      }
+      if (messageQuota && Number(messageQuota.remaining) < 1) {
+        updateMessageQuota(messageQuota);
+        return;
+      }
       error.textContent = '';
       const response = await fetch(url, {
         method: 'POST',
@@ -600,6 +627,9 @@
       });
       const payload = await response.json().catch(() => ({}));
       if (!payload.success) {
+        if (payload.error?.code === 'MESSAGE_LIMIT_REACHED') {
+          updateMessageQuota({ limit: 2, sent: 2, remaining: 0 });
+        }
         error.textContent = payload.error?.message || 'Could not send.';
         return;
       }

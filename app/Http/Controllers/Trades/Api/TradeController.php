@@ -10,7 +10,9 @@ use App\Services\Trades\TradeJoinService;
 use App\Services\Trades\TradeListingService;
 use App\Services\Trades\TradeModerationService;
 use App\Services\Trades\TradeNotificationService;
+use App\Support\AccessLogService;
 use App\Support\TradeApi;
+use App\Support\TradePaths;
 use App\Support\TradePresenter;
 use App\Support\TradeSchema;
 use Illuminate\Http\JsonResponse;
@@ -63,12 +65,12 @@ class TradeController extends Controller
                     $offering,
                     $looking,
                     $request->input('note'),
-                    \App\Support\AccessLogService::ip($request)
+                    AccessLogService::ip($request)
                 );
 
                 return TradeApi::ok([
                     'public_id' => $listing->public_id,
-                    'redirect' => \App\Support\TradePaths::show($listing->public_id),
+                    'redirect' => TradePaths::show($listing->public_id),
                     'trade' => TradePresenter::listing($listing),
                 ], 201);
             });
@@ -137,8 +139,12 @@ class TradeController extends Controller
                 ->map(fn ($row) => TradePresenter::threadMessage($row, $user))
                 ->values()
                 ->all();
+            $peer = $notifications->peer($user, $listing);
 
-            return TradeApi::ok(['items' => $items]);
+            return TradeApi::ok([
+                'items' => $items,
+                'message_quota' => $peer ? $notifications->messageQuota($user, $peer) : null,
+            ]);
         } catch (TradeException $e) {
             return TradeApi::fromException($e);
         }
