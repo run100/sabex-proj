@@ -632,19 +632,59 @@ class TradesBoardTest extends TestCase
             ->count());
     }
 
-    public function test_trade_messages_allow_literal_angle_text_without_markup(): void
+    public function test_trade_messages_reject_non_text_angle_characters(): void
     {
         $owner = $this->tradeUser('55508', 'AngleOwner');
         $buyer = $this->tradeUser('55509', 'AngleBuyer');
         $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
         $url = 'http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/messages';
 
-        foreach (['<3', '2 < 3'] as $message) {
+        foreach (['<3', '2 < 3', '&lt;script&gt;'] as $message) {
+            $this->actingAs($buyer, 'trades')
+                ->postJson($url, ['message' => $message])
+                ->assertStatus(422)
+                ->assertJsonPath('error.code', 'INVALID_MESSAGE');
+        }
+
+        $this->assertSame(0, TradeNotification::query()
+            ->where('listing_id', $listing->id)
+            ->where('type', TradeNotificationService::TYPE_MESSAGE)
+            ->count());
+    }
+
+    public function test_trade_messages_allow_unicode_text_and_common_punctuation(): void
+    {
+        $owner = $this->tradeUser('55514', 'NormalOwner');
+        $buyer = $this->tradeUser('55515', 'NormalBuyer');
+        $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+        $url = 'http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/messages';
+
+        foreach (["I'm ready to trade!", "中文消息 123，。！？\n下一行"] as $message) {
             $this->actingAs($buyer, 'trades')
                 ->postJson($url, ['message' => $message])
                 ->assertCreated()
                 ->assertJsonPath('data.message.message', $message);
         }
+    }
+
+    public function test_trade_messages_reject_non_text_characters_without_consuming_quota(): void
+    {
+        $owner = $this->tradeUser('55516', 'CharacterOwner');
+        $buyer = $this->tradeUser('55517', 'CharacterBuyer');
+        $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+        $url = 'http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/messages';
+
+        foreach (['Hello 😀', "Tab\tbed", "Hello\u{200B}World", "\x01control", '1=1', '2+2', '$100', 'C:\\temp'] as $message) {
+            $response = $this->actingAs($buyer, 'trades')
+                ->postJson($url, ['message' => $message]);
+            $this->assertSame(422, $response->status(), 'Unexpectedly accepted: '.json_encode($message, JSON_UNESCAPED_UNICODE));
+            $response->assertJsonPath('error.code', 'INVALID_MESSAGE');
+        }
+
+        $this->assertSame(0, TradeNotification::query()
+            ->where('listing_id', $listing->id)
+            ->where('type', TradeNotificationService::TYPE_MESSAGE)
+            ->count());
     }
 
     public function test_public_trade_inputs_treat_sql_payloads_as_values(): void

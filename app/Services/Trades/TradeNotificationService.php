@@ -69,6 +69,12 @@ class TradeNotificationService
         if ($this->containsMarkup($message)) {
             throw TradeException::invalid('INVALID_MESSAGE', 'HTML/XML tags are not allowed.');
         }
+        if (! $this->isNormalText($message)) {
+            throw TradeException::invalid(
+                'INVALID_MESSAGE',
+                'Only normal text, numbers, spaces, line breaks, and common punctuation are allowed.'
+            );
+        }
         $recipient = $this->recipient($actor, $listing);
         if ((int) $recipient->id === (int) $actor->id) {
             throw TradeException::invalid('INVALID_MESSAGE', 'You cannot message yourself.');
@@ -149,7 +155,15 @@ class TradeNotificationService
     private function containsMarkup(string $message): bool
     {
         return preg_match(
-            '/<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?\s*\/?>|<!--[\s\S]*?(?:-->|$)|<![A-Za-z][^>]*>|<\?[A-Za-z][^>]*\?>|<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?$/i',
+            '/<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?\s*\/?>|<!--[\s\S]*?(?:-->|$)|<![A-Za-z][^>]*>|<\?[A-Za-z][^>]*\?>|<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?$|&(?:[A-Za-z][A-Za-z0-9]+|#\d+|#x[0-9A-F]+);/i',
+            $message
+        ) === 1;
+    }
+
+    private function isNormalText(string $message): bool
+    {
+        return preg_match(
+            '/\A[\p{L}\p{M}\p{N}\p{Zs}\r\n.,!?;:\'"()\-_\/，。！？；：、（）「」『』【】《》〈〉…—–·]+\z/u',
             $message
         ) === 1;
     }

@@ -572,7 +572,11 @@
     }
 
     function containsMarkup(value) {
-      return /<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?\s*\/?>|<!--[\s\S]*?(?:-->|$)|<![A-Za-z][^>]*>|<\?[A-Za-z][^>]*\?>|<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?$/i.test(value);
+      return /<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?\s*\/?>|<!--[\s\S]*?(?:-->|$)|<![A-Za-z][^>]*>|<\?[A-Za-z][^>]*\?>|<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?$|&(?:[A-Za-z][A-Za-z0-9]+|#\d+|#x[0-9A-F]+);/i.test(value);
+    }
+
+    function isNormalText(value) {
+      return /^[\p{L}\p{M}\p{N}\p{Zs}\r\n.,!?;:'\"()\-_\/，。！？；：、（）「」『』【】《》〈〉…—–·]+$/u.test(value);
     }
 
     function updateMessageQuota(quota) {
@@ -612,6 +616,10 @@
       if (!message) return;
       if (containsMarkup(message)) {
         error.textContent = 'HTML/XML tags are not allowed.';
+        return;
+      }
+      if (!isNormalText(message)) {
+        error.textContent = 'Only normal text, numbers, spaces, line breaks, and common punctuation are allowed.';
         return;
       }
       if (messageQuota && Number(messageQuota.remaining) < 1) {
