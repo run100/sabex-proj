@@ -5,8 +5,8 @@
       <el-input v-model="q" placeholder="Search username / email / profile_id" clearable @clear="load" @keyup.enter="load" />
       <el-button type="primary" @click="load">Search</el-button>
       <el-radio-group v-model="scope">
-        <el-radio-button value="email">Email</el-radio-button>
         <el-radio-button value="all">All</el-radio-button>
+        <el-radio-button value="email">Email</el-radio-button>
       </el-radio-group>
     </div>
     <el-table :data="visible" stripe v-loading="loading">
@@ -123,7 +123,7 @@ import { ElMessage } from 'element-plus';
 import { api } from '../api';
 
 const q = ref('');
-const scope = ref('email');
+const scope = ref('all');
 const users = ref([]);
 const loading = ref(false);
 const accountStatuses = ['active', 'suspended', 'banned'];

@@ -28,16 +28,16 @@
     "src": "_instrument-sans-600-normal-B9e8oLYv.woff"
   },
   "console/main.js": {
-    "file": "assets/main-DTq6jkvY.js",
+    "file": "assets/main-BAm9rZS_.js",
     "name": "main",
     "src": "console/main.js",
     "isEntry": true,
     "css": [
-      "assets/main-BQwen3pI.css"
+      "assets/main-yLV3lYug.css"
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-CXwXOg6F.css",
+    "file": "assets/app-cq0udD_x.css",
     "name": "app",
     "names": [
       "app.css"
