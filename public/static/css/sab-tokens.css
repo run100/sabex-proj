@@ -33,19 +33,7 @@
 
 @media (max-width: 767px) {
   .sab-bottom-nav {
-    position: fixed;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 70;
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    align-items: stretch;
-    min-height: 56px;
-    padding: 0 4px env(safe-area-inset-bottom, 0);
-    border-top: 1px solid var(--sab-border);
-    background: rgba(5, 11, 24, 0.96);
-    backdrop-filter: blur(16px);
+    display: none;
   }
 
   .sab-bottom-nav__item {
@@ -73,9 +61,5 @@
 
   .sab-bottom-nav__item.is-active {
     color: var(--sab-blue);
-  }
-
-  body {
-    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
   }
 }
