@@ -104,6 +104,12 @@
   .sab-calc-seo-grid { display: grid; gap: 1rem; }
   .sab-calc-seo-panel { border: 1px solid rgba(148,163,184,.14); background: rgba(15,23,42,.58); border-radius: .875rem; padding: 1rem; box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
   .sab-calc-link-pill { display: inline-flex; align-items: center; border: 1px solid rgba(34,211,238,.35); border-radius: 9999px; padding: .35rem .65rem; background: rgba(8,145,178,.1); color: #67e8f9; font-size: .8125rem; font-weight: 800; line-height: 1.25; }
+  .sab-calc-trade-pills { display: flex; flex-wrap: wrap; gap: .5rem; padding-top: .55rem; }
+  .sab-calc-trade-pill { display: inline-flex; align-items: center; gap: .35rem; min-height: 2rem; padding: .35rem .85rem; border: 1px solid rgba(34,211,238,.35); border-radius: 9999px; background: rgba(8,145,178,.1); color: #67e8f9; font-size: .8125rem; font-weight: 800; line-height: 1.25; text-decoration: none; }
+  .sab-calc-trade-pill svg { width: .9rem; height: .9rem; flex-shrink: 0; }
+  .sab-calc-trade-pill:hover { border-color: rgba(165,243,252,.55); color: #a5f3fc; }
+  .sab-calc-trade-pill--primary { border-color: transparent; background: #0e7490; color: #ecfeff; }
+  .sab-calc-trade-pill--primary:hover { background: #0891b2; color: #fff; }
   .sab-calc-seo-title { margin-bottom: .55rem; font-size: .96rem; line-height: 1.35; font-weight: 900; color: #fff; }
   .sab-calc-seo-text { font-size: .84rem; line-height: 1.65; color: #cbd5e1; }
   .sab-calc-step-list { counter-reset: sab-step; list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }

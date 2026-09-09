@@ -90,6 +90,16 @@
       News · Aug 19 — SAB Values: Headless Horseman rebounds, Dragon Cannelloni drops
     </a>
   </div>
+  <div class="sab-calc-trade-pills" aria-label="Trade actions">
+    <a class="sab-calc-trade-pill sab-calc-trade-pill--primary" href="{{ \App\Support\TradePaths::create() }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      Create a Trade
+    </a>
+    <a class="sab-calc-trade-pill" href="{{ \App\Support\TradePaths::marketplace() }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>
+      View Trades
+    </a>
+  </div>
 </div>
 @endif
 

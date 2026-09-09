@@ -99,6 +99,11 @@ class SeoCacheAndNavTest extends TestCase
         $calculator = $this->get('http://www.sabex.lab/steal-a-brainrot-trading-calculator');
         $calculator->assertOk();
         $this->assertCalculatorBuilderOmitsCsrf($calculator->getContent());
+        $calculator->assertSee('Create a Trade')
+            ->assertSee('View Trades')
+            ->assertSee('href="'.\App\Support\TradePaths::create().'"', false)
+            ->assertSee('href="'.\App\Support\TradePaths::marketplace().'"', false)
+            ->assertSee('sab-calc-trade-pills', false);
     }
 
     public function test_logged_in_seo_html_stays_anonymous(): void
@@ -306,6 +311,9 @@ class SeoCacheAndNavTest extends TestCase
         $this->assertStringContainsString('/static/js/sab-nav-auth.js', $html);
         $this->assertStringContainsString('sab-wiki-drawer', $html);
         $this->assertStringContainsString('sab-bottom-nav', $html);
+        $this->assertStringNotContainsString('Create a Trade', $html);
+        $this->assertStringNotContainsString('View Trades', $html);
+        $this->assertStringNotContainsString('sab-calc-trade-pills', $html);
     }
 
     private function assertPublicSeoCdn($response): void
