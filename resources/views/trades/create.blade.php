@@ -126,5 +126,5 @@
 @endsection
 
 @section('scripts')
-@include('seo.sab.partials._trade-builder-boot')
+@include('seo.sab.partials._trade-builder-boot', ['tradeBuilderNeedsCsrf' => true])
 @endsection

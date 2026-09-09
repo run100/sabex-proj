@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\SeoGame;
 use App\Models\SeoItem;
+use App\Models\SeoNewsArticle;
 use App\Models\SeoSite;
 use App\Models\TradeUser;
 use App\Services\Seo\SabRenderService;
@@ -50,11 +51,40 @@ class SeoCacheAndNavTest extends TestCase
             'attributes_json' => [],
             'sort_order' => 0,
         ]);
+        SeoNewsArticle::query()->create([
+            'seo_site_id' => 1,
+            'type' => SeoNewsArticle::TYPE_STATIC_PAGE,
+            'slug' => 'about-us',
+            'locale' => 'en',
+            'title' => 'About us',
+            'excerpt' => '',
+            'cover_image_url' => '',
+            'body_html' => '<p>About</p>',
+            'status' => 'published',
+            'published_at' => now()->subDay(),
+            'meta_title' => '',
+            'meta_description' => '',
+            'sort_order' => 1,
+            'is_system_log' => false,
+        ]);
     }
 
     public function test_seo_pages_are_cdn_cacheable_and_omit_session_cookies(): void
     {
-        foreach (['/', '/wiki', '/products/cache-nav-item'] as $path) {
+        $paths = [
+            '/',
+            '/wiki',
+            '/products/cache-nav-item',
+            '/steal-a-brainrot-trading-calculator',
+            '/es/steal-a-brainrot-trading-calculator',
+            '/sab-value-list',
+            '/sab-exist-count-list',
+            '/steal-a-brainrot-codes',
+            '/games',
+            '/about-us',
+        ];
+
+        foreach ($paths as $path) {
             $response = $this->get('http://www.sabex.lab'.$path);
             $response->assertOk();
             $this->assertStringContainsString('s-maxage=14400', (string) $response->headers->get('Cache-Control'));
@@ -68,6 +98,10 @@ class SeoCacheAndNavTest extends TestCase
             $response->assertDontSee('name="csrf-token"', false);
             $response->assertDontSee('_token', false);
         }
+
+        $calculator = $this->get('http://www.sabex.lab/steal-a-brainrot-trading-calculator');
+        $calculator->assertOk();
+        $this->assertCalculatorBuilderOmitsCsrf($calculator->getContent());
     }
 
     public function test_logged_in_seo_html_stays_anonymous(): void
@@ -174,6 +208,21 @@ class SeoCacheAndNavTest extends TestCase
             ->assertSee('No matching trades yet.');
         $this->assertPrivateNoStore($trading);
 
+        $auth = $this->get('http://www.sabex.lab/auth/roblox')->assertOk();
+        $this->assertPrivateNoStore($auth);
+
+        $user = TradeUser::query()->create([
+            'roblox_sub' => '88002',
+            'roblox_user_id' => '88002',
+            'username' => 'cacheprofilexyz',
+            'display_name' => 'CacheProfileXYZ',
+            'avatar_url' => '',
+            'account_status' => TradeUser::STATUS_ACTIVE,
+            'last_login_at' => now(),
+        ]);
+        $profile = $this->get('http://www.sabex.lab/profile/'.$user->profile_id)->assertOk();
+        $this->assertPrivateNoStore($profile);
+
         $me = $this->getJson('http://www.sabex.lab/api/v1/me')
             ->assertOk()
             ->assertJsonPath('success', true)
@@ -249,5 +298,17 @@ class SeoCacheAndNavTest extends TestCase
         $cacheControl = strtolower((string) $response->headers->get('Cache-Control'));
         $this->assertStringContainsString('private', $cacheControl);
         $this->assertStringContainsString('no-store', $cacheControl);
+    }
+
+    private function assertCalculatorBuilderOmitsCsrf(string $html): void
+    {
+        $this->assertSame(1, preg_match(
+            '/<script type="application\/json" id="sab-trade-builder-config">(.*?)<\/script>/s',
+            $html,
+            $match
+        ));
+        $config = json_decode($match[1], true);
+        $this->assertIsArray($config);
+        $this->assertSame('', $config['csrf'] ?? null);
     }
 }

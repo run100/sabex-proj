@@ -4,7 +4,7 @@
       'ui' => $calculatorUi ?? $calcUi ?? [],
       'rarityAll' => $t['rarity_filter_all'] ?? 'All',
       'publishUrl' => $tradePublishUrl ?? '/api/v1/trading/trades',
-      'csrf' => csrf_token(),
+      'csrf' => !empty($tradeBuilderNeedsCsrf) ? csrf_token() : '',
       'maxItemsPerSide' => (int) ($maxItemsPerSide ?? config('sab-trades.max_items_per_side', 9)),
       'draftKey' => 'sab-trade-draft',
   ];
