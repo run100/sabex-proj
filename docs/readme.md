@@ -222,16 +222,18 @@ php83 scripts/export-sab-to-mysql.php
 
 不要从 MySQL 全表重造价格 JSON（早期观测只有 base，mutation 历史在文件里）。
 
-### 2. 本站日更（已接上，不经过 GEOFlow）
+### 2. 本站计算器日更（独立，不经过 GEOFlow）
 
 ```bash
 cd /Users/coolshell/projects/ai2024/sabex-proj
 php83 artisan seo:sab-calculator-refresh
 ```
 
-`bootstrap/app.php` 默认每天 `04:30`。`SAB_CALCULATOR_SYNC_ENABLED` / `SAB_CALCULATOR_SYNC_AT`。
+`bootstrap/app.php` 默认每天 `04:30`。`SAB_CALCULATOR_SYNC_ENABLED` / `SAB_CALCULATOR_SYNC_AT`。本机页面：`http://www.sabex.lab:7510/steal-a-brainrot-trading-calculator`。
 
-打 rot.rocks，**只更新已经 listed 的商品**：写 `seo_item_current_values`，12h 相同 hash 不重复插观测，按 slug 合并当天点到本站 `{slug}.json`（不删历史点，不写 GEOFlow）。远程有、本库没有的新 slug 会计入 `skipped_remote`，**不会自动建商品**。新商品要等下面第 3 步从 GEOFlow upsert 过来。
+打 rot.rocks 的 brainrots / mutations / traits，在本站 upsert 商品、变体、`seo_item_current_values`；远程新 slug **直接建商品**（`is_listed=true`，`is_publish_html=false`）。12h 相同 hash 不重复插观测。按 slug 合并当天点到本站 `{slug}.json`（不删历史点）。重写 `sab-calculator-meta.json`（traits / mutations / streak / `synced_at`，页头 Last update 读这个）。计算器图已在 `public/uploads/images/sab/calculator/` 则复用（本机这个目录若仍是 GEOFlow symlink，只读不写）。缺图下载到本站 `public/uploads/images/sab-calculator/`。不写 GEOFlow，也不生成静态 HTML。
+
+新闻 / wiki / exist count / codes 仍可走下面第 3 步，和这条命令无关。
 
 ### 3. 再把 GEOFlow 最新业务数据同步过来（已按 upsert 做）
 
@@ -242,7 +244,7 @@ export 已是按主键 upsert。需要时再跑同一脚本即可（先 `--dry-r
 - `seo_news_articles` / `seo_value_sources` / aliases / translations
 - **不要**导出或覆盖 `seo_item_observations`
 - **不要**重写 `sab-price-history/`
-- checksum 不同才覆盖 `codes.json`、`sab-i18n.json`、gallery、calculator-meta；`rebirths.json` 已在本站
+- checksum 不同才覆盖 `codes.json`、`sab-i18n.json`、gallery；`rebirths.json` 已在本站。`sab-calculator-meta.json` 由本站日更写，不要用 GEOFlow 覆盖
 - 商品图目录是指向 GEOFlow 同名目录的 symlink，新图自动可见，不删旧图
 
 对照：`http://127.0.0.1:8083/seo/sab/preview/wiki` 与各子页；抽旧商品 + 新商品的 exist/当前价、`/news` 条数、codes；30D 图仍读本站 JSON。本机 7310 若没起来，用实际入口 `http://127.0.0.1:7510/`。
@@ -262,15 +264,15 @@ export 已是按主键 upsert。需要时再跑同一脚本即可（先 `--dry-r
 
 调度在 `bootstrap/app.php`，默认 `04:30`。环境变量：`SAB_CALCULATOR_SYNC_ENABLED`、`SAB_CALCULATOR_SYNC_AT`。
 
-行为：打 rot.rocks，只更新已有 listed 商品的 `current_values`；12h 相同 hash 不重复插观测；按 slug 合并当天点，覆盖写本站 `{slug}.json`，不删历史点。
+行为：打 rot.rocks，upsert 本站商品 / 变体 / 当前价 / traits；远程新品直接建（不发布 SEO 商品页）；12h 相同 hash 不重复插观测；按 slug 合并当天点到本站 `{slug}.json`；重写 calculator meta 的 `synced_at`。动态页直接读库，不再 `seo:sab-render`。
 
-GEOFlow 的 `seo:sab-calculator-refresh`（preview → 有变化才 sync → render）**不再作为本站日更入口**。
+GEOFlow 的同名命令（preview → 有变化才 sync → render）**不再作为本站日更入口**。
 
 ## 和 GEOFlow 的关系
 
 | | GEOFlow | sabex |
 | --- | --- | --- |
-| 角色 | 源库、对照 preview、新品/新闻/exist 仍可能先在那边落库 | 线上 sabexistcount 的独立动态站 |
+| 角色 | 对照 preview、新闻 / wiki / exist / codes 仍可能先在那边落库 | 线上 sabexistcount 的独立动态站；计算器日更自给自足 |
 | 库 | Postgres，**禁止为调试改它** | MySQL `sabexistcount` |
 | Preview | `http://127.0.0.1:8083/seo/sab/preview/` | 本机拟用 `http://127.0.0.1:7310/` |
 | Wiki | `/seo/sab/preview/wiki` 及子页 | 已挂 `/wiki`（公开站 `index,follow`） |
@@ -278,9 +280,9 @@ GEOFlow 的 `seo:sab-calculator-refresh`（preview → 有变化才 sync → ren
 
 日常数据流：
 
-1. GEOFlow 继续采集 / 人工改商品和新闻（Postgres）
-2. 需要时跑 upsert 版 export，把业务表和 codes/i18n/gallery/meta 同步到 sabex（观测和价格 JSON 除外）
-3. sabex 自己每天打 rot.rocks 更新当前价和 `{slug}.json`
+1. sabex 每天跑 `seo:sab-calculator-refresh`，自己打 rot.rocks 更新当前价、traits、新品和 `{slug}.json`
+2. GEOFlow 继续采集 / 人工改新闻、wiki、exist count、codes
+3. 需要时再跑 upsert 版 export，把新闻 / wiki / exist / codes 同步到 sabex（不要覆盖观测和价格 JSON；calculator-meta 以本站日更为准）
 
 ## 硬约束
 

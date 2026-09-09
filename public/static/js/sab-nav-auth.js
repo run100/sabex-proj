@@ -89,9 +89,19 @@
     var badge = unread > 0 ? '<span class="sab-nav-auth__badge">' + unread + '</span>' : '';
     root.innerHTML =
       '<a href="/notifications" class="sab-nav-auth__link" aria-label="Alerts">' + icon('bell') + badge + '</a>' +
-      '<a href="' + escapeHtml(profile) + '" class="sab-nav-auth__chip" aria-label="' + name + '">' +
-        '<img class="sab-nav-auth__avatar" src="' + avatar + '" alt="" width="28" height="28">' +
-      '</a>';
+      '<details class="sab-account-nav" data-sab-account-nav>' +
+        '<summary class="sab-nav-auth__chip" aria-label="' + name + '">' +
+          '<img class="sab-nav-auth__avatar" src="' + avatar + '" alt="" width="28" height="28">' +
+        '</summary>' +
+        '<div class="sab-account-nav__menu">' +
+          '<div class="sab-account-nav__head">' +
+            '<img class="sab-account-nav__photo" src="' + avatar + '" alt="" width="40" height="40">' +
+            '<p class="sab-nav-auth__name">' + name + '</p>' +
+          '</div>' +
+          '<a href="' + escapeHtml(profile) + '" class="sab-account-nav__item">' + icon('user') + '<span>Profile</span></a>' +
+          '<button type="button" class="sab-account-nav__item sab-account-nav__item--out" data-nav-sign-out>' + icon('logout') + '<span>Sign out</span></button>' +
+        '</div>' +
+      '</details>';
   }
 
   function renderDrawer(root, user, unread) {

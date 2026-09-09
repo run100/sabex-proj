@@ -98,36 +98,54 @@ class SeoCacheAndNavTest extends TestCase
     public function test_home_and_trading_share_full_header_nav_and_language_switch(): void
     {
         foreach (['/', '/trading'] as $path) {
-            $this->get('http://www.sabex.lab'.$path)
-                ->assertOk()
+            $response = $this->get('http://www.sabex.lab'.$path);
+            $response->assertOk()
                 ->assertSee('sab-site-header', false)
                 ->assertSee('sab-wiki-drawer-trigger', false)
                 ->assertSee('SAB<span class="sab-brand-accent">ExistCount</span>.com', false)
                 ->assertSee('color: #67e8f9', false)
                 ->assertSee('/static/css/sab-tokens.css', false)
-                ->assertSee('sab-main-nav', false)
+                ->assertSee('sab-main-nav sab-main-nav--desktop', false)
+                ->assertSee('sab-main-nav sab-main-nav--compact', false)
+                ->assertSee('sab-trading-nav', false)
+                ->assertSee('sab-nav-badge--hot', false)
+                ->assertSee('sab-nav-badge--new', false)
                 ->assertSee('sab-bottom-nav', false)
                 ->assertSee('sab-bottom-nav__item', false)
+                ->assertSee('Trade Ads')
+                ->assertSee('SAB Values')
+                ->assertSee('>HOT</span>', false)
+                ->assertSee('>NEW</span>', false)
                 ->assertSee('Values')
                 ->assertSee('Trades')
                 ->assertSee('Calculator')
                 ->assertSee('Guides')
+                ->assertSee('Wiki')
                 ->assertSee('News')
                 ->assertSee('Home')
                 ->assertSee('More')
                 ->assertSee('Codes')
-                ->assertSee('Exist Count Gallery')
+                ->assertSee('Exist Count List')
+                ->assertSee('>Login</a>', false)
                 ->assertSee(SabRenderService::PAGE_CODES, false)
-                ->assertSee(SabRenderService::PAGE_EXIST_COUNT_GALLERY, false)
                 ->assertSee(SabRenderService::PAGE_VALUE_LIST, false)
                 ->assertSee('/wiki', false)
                 ->assertSee('data-sab-language-switch', false)
                 ->assertSee('value="/pt"', false)
                 ->assertSee('>PT</option>', false)
+                ->assertSee('Create Trade Ad')
+                ->assertSee('View Trade Ads')
+                ->assertSee('View Offers')
+                ->assertSee(\App\Support\TradePaths::pending(), false)
                 ->assertSee('>Create Trade Ad</span>', false)
                 ->assertSee('>View Trade Ads</span>', false)
                 ->assertDontSee('>Post</span>', false)
                 ->assertDontSee('>Activity</span>', false);
+
+            preg_match('/class="sab-main-nav sab-main-nav--desktop"[^>]*>(.*?)<\/nav>/s', $response->getContent(), $desktopNav);
+            $this->assertNotSame('', $desktopNav[1] ?? '');
+            $this->assertStringContainsString('sab-trading-nav', $desktopNav[1]);
+            $this->assertStringNotContainsString('Exist Count Gallery', $desktopNav[1]);
         }
 
         $navJs = (string) file_get_contents(public_path('static/js/sab-nav-auth.js'));
@@ -135,8 +153,14 @@ class SeoCacheAndNavTest extends TestCase
         $this->assertSame(1, preg_match('/function renderHeader[\s\S]+function renderDrawer/', $navJs, $headerFn));
         $this->assertStringContainsString("icon('bell')", $headerFn[0]);
         $this->assertStringContainsString('aria-label="Alerts"', $headerFn[0]);
-        $this->assertStringNotContainsString('Sign out', $headerFn[0]);
-        $this->assertStringNotContainsString('sab-nav-auth__name', $headerFn[0]);
+        $this->assertStringContainsString('data-sab-account-nav', $headerFn[0]);
+        $this->assertStringContainsString('Profile', $headerFn[0]);
+        $this->assertStringContainsString('Sign out', $headerFn[0]);
+        $this->assertStringContainsString('data-nav-sign-out', $headerFn[0]);
+        $this->assertStringNotContainsString('Last seen', $headerFn[0]);
+        $headerView = (string) file_get_contents(resource_path('views/seo/sab/partials/_header.blade.php'));
+        $this->assertStringContainsString('.sab-account-nav__menu', $headerView);
+        $this->assertStringContainsString('#fb7185', $headerView);
         $this->assertSame(1, preg_match('/function renderDrawer[\s\S]+function renderBar/', $navJs, $drawerFn));
         $this->assertStringNotContainsString("'Account'", $drawerFn[0]);
     }

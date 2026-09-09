@@ -37,11 +37,13 @@ class TradeListingService
     {
         $this->assertActive($user);
         $this->assertCanPost($user);
-        $this->assertPostLimits($user);
 
         $snapshot = $this->valuation->snapshot($offering, $lookingFor);
 
         return DB::transaction(function () use ($user, $snapshot, $note, $ip): TradeListing {
+            TradeUser::query()->where('id', $user->id)->lockForUpdate()->first();
+            $this->assertPostLimits($user);
+
             $listing = TradeListing::query()->create([
                 'owner_user_id' => $user->id,
                 'status' => TradeListing::STATUS_OPEN,
@@ -395,6 +397,13 @@ class TradeListingService
             ->where('created_at', '>=', now()->subHour())
             ->count();
         if ($hourly >= (int) config('sab-trades.post_trade_limit_per_hour', 10)) {
+            throw TradeException::rateLimited();
+        }
+        $daily = TradeListing::query()
+            ->where('owner_user_id', $user->id)
+            ->where('created_at', '>=', now()->startOfDay())
+            ->count();
+        if ($daily >= (int) config('sab-trades.post_trade_limit_per_day', 2)) {
             throw TradeException::rateLimited();
         }
     }

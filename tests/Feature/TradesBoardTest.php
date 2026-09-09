@@ -83,6 +83,41 @@ class TradesBoardTest extends TestCase
             ->assertSee($listing->public_id);
     }
 
+    public function test_user_can_post_two_trades_per_utc_day(): void
+    {
+        $user = $this->tradeUser('55540', 'DailyCap');
+        $payload = [
+            'offering' => [['slug' => 'noobini']],
+            'looking_for' => [['slug' => 'cappuccino']],
+        ];
+
+        $this->actingAs($user, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades', $payload)
+            ->assertCreated();
+        $this->actingAs($user, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades', $payload)
+            ->assertCreated();
+        $this->actingAs($user, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades', $payload)
+            ->assertStatus(429)
+            ->assertJsonPath('error.code', 'RATE_LIMITED');
+
+        $first = TradeListing::query()->where('owner_user_id', $user->id)->orderBy('id')->first();
+        $this->assertNotNull($first);
+        $this->actingAs($user, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades/'.$first->public_id.'/cancel')
+            ->assertOk();
+        $this->actingAs($user, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades', $payload)
+            ->assertStatus(429)
+            ->assertJsonPath('error.code', 'RATE_LIMITED');
+
+        $this->travel(1)->days();
+        $this->actingAs($user, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades', $payload)
+            ->assertCreated();
+    }
+
     public function test_publish_persists_traits_and_shows_them_on_the_board(): void
     {
         $this->seedCalculatorMeta([
@@ -863,6 +898,7 @@ class TradesBoardTest extends TestCase
 
     public function test_activity_tabs_count_open_listing_only_in_all(): void
     {
+        $this->raiseTradePostLimits();
         $owner = $this->tradeUser('52', 'Poster');
         $buyer = $this->tradeUser('53', 'OfferBuyer');
         $ownListing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
@@ -1041,6 +1077,7 @@ class TradesBoardTest extends TestCase
         config([
             'sab-trades.max_active_listings_per_user' => 50,
             'sab-trades.post_trade_limit_per_hour' => 50,
+            'sab-trades.post_trade_limit_per_day' => 50,
             'sab-trades.join_limit_per_hour' => 50,
         ]);
     }
