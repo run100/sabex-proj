@@ -3,7 +3,6 @@
 @section('content')
 @php
   $calcUi = $calculatorUi ?? [];
-  $noteMax = 280;
 @endphp
 @include('seo.sab.partials._calculator-styles')
 <style>
@@ -80,20 +79,22 @@
     </section>
   </div>
 
+  {{--
   <div class="trades-create__note">
     <div class="trades-create__note-head">
       <label for="trade-note">Add a note</label>
-      <span><span data-note-count>0</span>/{{ $noteMax }}</span>
+      <span><span data-note-count>0</span>/280</span>
     </div>
     <p class="trades-create__note-help">Optional — what you are looking for, in one line.</p>
     <input
       id="trade-note"
       type="text"
-      maxlength="{{ $noteMax }}"
+      maxlength="280"
       data-trade-note
       placeholder="e.g. Looking for a quick trade, collector items only"
     >
   </div>
+  --}}
 
   <aside class="trades-create__warning">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">

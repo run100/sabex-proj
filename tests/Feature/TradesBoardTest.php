@@ -52,6 +52,7 @@ class TradesBoardTest extends TestCase
 
         $listing = TradeListing::query()->first();
         $this->assertNotNull($listing);
+        $this->assertNull($listing->note);
         $this->assertSame(0, (int) $listing->sort_order);
         $this->assertSame(TradeListing::FLAG_NO, $listing->is_hot);
         $this->assertSame(TradeListing::FLAG_NO, $listing->is_top);
@@ -847,7 +848,7 @@ class TradesBoardTest extends TestCase
             ->assertCreated();
 
         $submitted = TradeListing::query()->where('owner_user_id', $submitter->id)->latest('id')->firstOrFail();
-        $this->assertSame($injection, $submitted->note);
+        $this->assertNull($submitted->note);
 
         $messageUrl = 'http://www.sabex.lab/api/v1/trading/trades/'.$older->public_id.'/messages';
         $this->actingAs($buyer, 'trades')

@@ -32,6 +32,7 @@ class TradeListingService
     /**
      * @param  array<int, mixed>  $offering
      * @param  array<int, mixed>  $lookingFor
+     * @param  string|null  $note  Kept for compatibility while listing notes are disabled.
      */
     public function create(TradeUser $user, array $offering, array $lookingFor, ?string $note = null, ?string $ip = null): TradeListing
     {
@@ -40,7 +41,7 @@ class TradeListingService
 
         $snapshot = $this->valuation->snapshot($offering, $lookingFor);
 
-        return DB::transaction(function () use ($user, $snapshot, $note, $ip): TradeListing {
+        return DB::transaction(function () use ($user, $snapshot, $ip): TradeListing {
             TradeUser::query()->where('id', $user->id)->lockForUpdate()->first();
             $this->assertPostLimits($user);
 
@@ -52,7 +53,6 @@ class TradeListingService
                 'looking_value_snapshot' => $snapshot['looking_total'],
                 'value_difference_snapshot' => $snapshot['difference'],
                 'difference_percent_snapshot' => $snapshot['difference_percent'],
-                'note' => $note !== null ? mb_substr(trim($note), 0, 280) : null,
                 'expires_at' => now()->addHours((int) config('sab-trades.trade_expire_hours', 72)),
                 ...AccessLogService::attrs('seo_trade_listings', [
                     'posted_ip' => $ip,

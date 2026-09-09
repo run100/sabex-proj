@@ -64,7 +64,7 @@ class TradeController extends Controller
                     auth('trades')->user(),
                     $offering,
                     $looking,
-                    $request->input('note'),
+                    null,
                     AccessLogService::ip($request)
                 );
 

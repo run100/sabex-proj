@@ -47,8 +47,6 @@
   const configPanels = Array.from(root.querySelectorAll('[data-config-panel]'));
   const searchBrainrot = root.querySelector('[data-search-brainrot]');
   const searchTrait = root.querySelector('[data-search-trait]');
-  const noteInput = root.querySelector('[data-trade-note]');
-  const noteCount = root.querySelector('[data-note-count]');
   const authModal = document.querySelector('[data-roblox-auth-modal]');
 
   function money(value) {
@@ -350,11 +348,6 @@
     });
   }
 
-  function updateNoteCount() {
-    if (!noteInput || !noteCount) return;
-    noteCount.textContent = String(noteInput.value.length);
-  }
-
   function render() {
     if (layout === 'grid') {
       renderSideGrid('offer');
@@ -365,7 +358,6 @@
       renderCompare();
     }
     updatePublishReady();
-    updateNoteCount();
   }
 
   function openModal(side, index = null) {
@@ -697,7 +689,6 @@
       window.localStorage.setItem(draftKey, JSON.stringify({
         offer: serializeSide(state.offer),
         receive: serializeSide(state.receive),
-        note: noteInput ? noteInput.value : '',
       }));
     } catch (error) {
       // Ignore quota / private mode.
@@ -720,9 +711,6 @@
       const draft = JSON.parse(raw);
       state.offer = hydrateItems(draft.offer);
       state.receive = hydrateItems(draft.receive);
-      if (noteInput && typeof draft.note === 'string') {
-        noteInput.value = draft.note.slice(0, Number(noteInput.maxLength) || 280);
-      }
     } catch (error) {
       // Ignore bad drafts.
     }
@@ -808,7 +796,6 @@
         body: JSON.stringify({
           offering: serialize(state.offer),
           looking_for: serialize(state.receive),
-          note: noteInput?.value || '',
         }),
       });
       const payload = await response.json().catch(() => ({}));
@@ -836,7 +823,6 @@
     clearBtn.addEventListener('click', () => {
       state.offer = [];
       state.receive = [];
-      if (noteInput) noteInput.value = '';
       clearDraft();
       render();
     });
@@ -882,10 +868,6 @@
   searchBrainrot?.addEventListener('input', renderBrainrotGrid);
   searchTrait?.addEventListener('input', renderTraits);
   modal?.addEventListener('click', event => { if (event.target === modal) closeModal(); });
-  noteInput?.addEventListener('input', () => {
-    updateNoteCount();
-    persistDraft();
-  });
 
   if (authModal) {
     authModal.querySelectorAll('[data-auth-modal-close]').forEach((btn) => {
