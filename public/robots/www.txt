@@ -1,5 +1,19 @@
 User-agent: *
 Allow: /
+Disallow: /pt/products/
+Disallow: /pt/news/
+Disallow: /es/products/
+Disallow: /es/news/
+Disallow: /de/products/
+Disallow: /de/news/
+Disallow: /ru/products/
+Disallow: /ru/news/
+Disallow: /fr/products/
+Disallow: /fr/news/
+Disallow: /tr/products/
+Disallow: /tr/news/
+Disallow: /pl/products/
+Disallow: /pl/news/
 
 
 Sitemap: https://sabexistcount.com/sitemap.xml
