@@ -1,5 +1,2 @@
 User-agent: *
-Allow: /
-
-
-Sitemap: https://sabexistcount.com/sitemap.xml
+Disallow: /
