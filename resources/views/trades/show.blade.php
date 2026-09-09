@@ -27,6 +27,7 @@
   $loginHref = \App\Support\TradePaths::robloxLogin('/trading/'.$listing->public_id);
   $messageUrl = '/api/v1/trading/trades/'.$listing->public_id.'/messages';
   $messagePeer = $messagePeer ?? null;
+  $joinQuota = $joinQuota ?? null;
   $canMessage = $user && $messagePeer && (int) $messagePeer->id !== (int) $user->id;
   $peerName = $messagePeer?->display_name ?: $messagePeer?->username ?: 'Trader';
   $peerAvatar = (string) ($messagePeer?->avatar_url ?? '');
@@ -465,7 +466,7 @@
 @endif
 
 @if($canSendOffer)
-<div class="trades-offer" hidden data-offer-modal>
+<div class="trades-offer" hidden data-offer-modal data-contact-limit="{{ $joinQuota['limit'] ?? '' }}" data-contact-remaining="{{ $joinQuota['remaining'] ?? '' }}">
   <div class="trades-offer__dialog" role="dialog" aria-modal="true" aria-labelledby="trades-offer-title">
     <header class="trades-offer__head">
       <div class="trades-offer__who">
@@ -546,6 +547,14 @@
     });
   });
 
+  function containsTradeMarkup(value) {
+    return /<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?\s*\/?>|<!--[\s\S]*?(?:-->|$)|<![A-Za-z][^>]*>|<\?[A-Za-z][^>]*\?>|<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?$|&(?:[A-Za-z][A-Za-z0-9]+|#\d+|#x[0-9A-F]+);/i.test(value);
+  }
+
+  function isTradeNormalText(value) {
+    return /^[\p{L}\p{M}\p{N}\p{Zs}\r\n.,!?;:'\"()\-_\/，。！？；：、（）「」『』【】《》〈〉…—–·]+$/u.test(value);
+  }
+
 @if($canMessage)
   (function () {
     const modal = document.querySelector('[data-message-modal]');
@@ -571,14 +580,6 @@
         .replace(/"/g, '&quot;');
     }
 
-    function containsMarkup(value) {
-      return /<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?\s*\/?>|<!--[\s\S]*?(?:-->|$)|<![A-Za-z][^>]*>|<\?[A-Za-z][^>]*\?>|<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?$|&(?:[A-Za-z][A-Za-z0-9]+|#\d+|#x[0-9A-F]+);/i.test(value);
-    }
-
-    function isNormalText(value) {
-      return /^[\p{L}\p{M}\p{N}\p{Zs}\r\n.,!?;:'\"()\-_\/，。！？；：、（）「」『』【】《》〈〉…—–·]+$/u.test(value);
-    }
-
     function updateMessageQuota(quota) {
       messageQuota = quota && typeof quota === 'object' ? quota : null;
       const exhausted = messageQuota && Number(messageQuota.remaining) < 1;
@@ -588,7 +589,7 @@
         button.disabled = Boolean(exhausted);
       });
       if (exhausted) {
-        error.textContent = 'You can send at most 2 messages to this user.';
+        error.textContent = 'You can send at most 2 messages or trade requests to this user.';
       }
     }
 
@@ -607,18 +608,18 @@
         error.textContent = payload.error?.message || 'Could not load messages.';
         return;
       }
-      updateMessageQuota(payload.data?.message_quota);
+      updateMessageQuota(payload.data?.contact_quota || payload.data?.message_quota);
       renderItems(payload.data?.items || []);
     }
 
     async function sendMessage(text) {
       const message = String(text || '').trim();
       if (!message) return;
-      if (containsMarkup(message)) {
+      if (containsTradeMarkup(message)) {
         error.textContent = 'HTML/XML tags are not allowed.';
         return;
       }
-      if (!isNormalText(message)) {
+      if (!isTradeNormalText(message)) {
         error.textContent = 'Only normal text, numbers, spaces, line breaks, and common punctuation are allowed.';
         return;
       }
@@ -675,13 +676,38 @@
     if (!modal) return;
     const form = modal.querySelector('[data-offer-form]');
     const error = modal.querySelector('[data-offer-error]');
+    const noteInput = form?.querySelector('[name="note"]');
+    const submitButton = form?.querySelector('button[type="submit"]');
+    const contactLimit = Number(modal.getAttribute('data-contact-limit') || 2);
+    const rawRemaining = modal.getAttribute('data-contact-remaining');
+    let contactQuota = rawRemaining === null || rawRemaining === ''
+      ? null
+      : {
+          limit: contactLimit,
+          sent: Math.max(0, contactLimit - Number(rawRemaining)),
+          remaining: Math.max(0, Number(rawRemaining)),
+        };
+
+    function updateOfferQuota(quota) {
+      contactQuota = quota && typeof quota === 'object' ? quota : null;
+      const exhausted = contactQuota && Number(contactQuota.remaining) < 1;
+      if (noteInput) noteInput.disabled = Boolean(exhausted);
+      if (submitButton) submitButton.disabled = Boolean(exhausted);
+      if (exhausted && error) {
+        error.textContent = 'You can send at most 2 messages or trade requests to this user.';
+      }
+    }
 
     function setOpen(open) {
       modal.hidden = !open;
       document.body.classList.toggle('trades-offer-open', open);
-      if (open && error) error.textContent = '';
+      if (open) {
+        if (error) error.textContent = '';
+        updateOfferQuota(contactQuota);
+      }
     }
 
+    updateOfferQuota(contactQuota);
     document.querySelector('[data-offer-open]')?.addEventListener('click', () => setOpen(true));
     modal.querySelectorAll('[data-offer-close]').forEach((button) => {
       button.addEventListener('click', () => setOpen(false));
@@ -696,6 +722,18 @@
       event.preventDefault();
       if (error) error.textContent = '';
       const note = String(new FormData(form).get('note') || '').trim();
+      if (note && containsTradeMarkup(note)) {
+        if (error) error.textContent = 'HTML/XML tags are not allowed.';
+        return;
+      }
+      if (note && !isTradeNormalText(note)) {
+        if (error) error.textContent = 'Only normal text, numbers, spaces, line breaks, and common punctuation are allowed.';
+        return;
+      }
+      if (contactQuota && Number(contactQuota.remaining) < 1) {
+        updateOfferQuota(contactQuota);
+        return;
+      }
       const response = await fetch(form.getAttribute('action'), {
         method: 'POST',
         credentials: 'same-origin',
@@ -704,8 +742,18 @@
       });
       const payload = await response.json().catch(() => ({}));
       if (!payload.success) {
+        if (payload.error?.code === 'JOIN_LIMIT_REACHED') {
+          updateOfferQuota({ limit: contactLimit, sent: contactLimit, remaining: 0 });
+        }
         if (error) error.textContent = payload.error?.message || 'Could not send offer.';
         return;
+      }
+      if (contactQuota) {
+        updateOfferQuota({
+          limit: Number(contactQuota.limit),
+          sent: Number(contactQuota.sent) + 1,
+          remaining: Math.max(0, Number(contactQuota.remaining) - 1),
+        });
       }
       setOpen(false);
       if (window.tradesToast) {

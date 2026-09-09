@@ -7,6 +7,7 @@ use App\Models\TradeJoinRequest;
 use App\Models\TradeListing;
 use App\Models\TradeUser;
 use App\Models\TradeUserBlock;
+use App\Support\TradeTextPolicy;
 use Illuminate\Support\Facades\DB;
 
 class TradeJoinService
@@ -14,56 +15,93 @@ class TradeJoinService
     public function __construct(
         private readonly TradeListingService $listings,
         private readonly TradeNotificationService $notifications,
+        private readonly TradeInteractionQuotaService $quota,
     ) {}
 
-    public function join(TradeUser $user, TradeListing $listing, ?string $note = null): TradeJoinRequest
+    public function join(TradeUser $user, TradeListing $listing, mixed $note = null): TradeJoinRequest
     {
         $this->assertActive($user);
-        if ((int) $listing->owner_user_id === (int) $user->id) {
-            throw TradeException::forbidden('CANNOT_JOIN_OWN_TRADE', 'You cannot join your own trade.');
-        }
-        if (! $listing->isOpen()) {
-            throw TradeException::conflict('TRADE_NOT_OPEN', 'This trade is no longer open.');
-        }
-        if ($this->blocked($user, $listing->owner)) {
-            throw TradeException::forbidden('USER_BLOCKED', 'This trade is not available.');
-        }
-        $existing = TradeJoinRequest::query()
-            ->where('listing_id', $listing->id)
-            ->where('requester_user_id', $user->id)
-            ->where('status', TradeJoinRequest::STATUS_REQUESTED)
-            ->first();
-        if ($existing) {
-            throw TradeException::conflict('JOIN_ALREADY_EXISTS', 'You already requested to join this trade.');
-        }
-        $hourly = TradeJoinRequest::query()
-            ->where('requester_user_id', $user->id)
-            ->where('created_at', '>=', now()->subHour())
-            ->count();
-        if ($hourly >= (int) config('sab-trades.join_limit_per_hour', 30)) {
-            throw TradeException::rateLimited();
-        }
+        $note = TradeTextPolicy::optional($note);
 
-        $request = TradeJoinRequest::query()->create([
-            'listing_id' => $listing->id,
-            'requester_user_id' => $user->id,
-            'owner_user_id' => $listing->owner_user_id,
-            'status' => TradeJoinRequest::STATUS_REQUESTED,
-            'note' => $note !== null ? mb_substr(trim($note), 0, 280) : null,
-            'expires_at' => $listing->expires_at,
-        ]);
-        $this->listings->event($listing, 'join_requested', $user, ['join_public_id' => $request->public_id]);
-        $this->notifications->notify(
-            $listing->owner,
-            'join_requested',
-            'New join request',
-            ($user->display_name ?: $user->username).' asked to join your trade.',
-            $listing,
-            $request,
-            $user,
-        );
+        return DB::transaction(function () use ($user, $listing, $note): TradeJoinRequest {
+            $lockedListing = TradeListing::query()
+                ->with('owner')
+                ->where('id', $listing->id)
+                ->lockForUpdate()
+                ->first();
+            if ($lockedListing === null || $lockedListing->owner === null) {
+                throw TradeException::notFound();
+            }
 
-        return $request;
+            $owner = $lockedListing->owner;
+            $this->quota->lockPair($user, $owner);
+            $user->refresh();
+            $this->assertActive($user);
+
+            if ((int) $lockedListing->owner_user_id === (int) $user->id) {
+                throw TradeException::forbidden('CANNOT_JOIN_OWN_TRADE', 'You cannot join your own trade.');
+            }
+            if (! $lockedListing->isOpen()) {
+                throw TradeException::conflict('TRADE_NOT_OPEN', 'This trade is no longer open.');
+            }
+            if ($this->blocked($user, $owner)) {
+                throw TradeException::forbidden('USER_BLOCKED', 'This trade is not available.');
+            }
+
+            $existing = TradeJoinRequest::query()
+                ->where('listing_id', $lockedListing->id)
+                ->where('requester_user_id', $user->id)
+                ->where('status', TradeJoinRequest::STATUS_REQUESTED)
+                ->first();
+            if ($existing) {
+                throw TradeException::conflict('JOIN_ALREADY_EXISTS', 'You already requested to join this trade.');
+            }
+
+            $quota = $this->quota->contactQuota($user, $owner);
+            if ($quota['remaining'] < 1) {
+                throw TradeException::conflict(
+                    'JOIN_LIMIT_REACHED',
+                    'You can send at most '.$quota['limit'].' messages or trade requests to this user.'
+                );
+            }
+
+            $hourly = TradeJoinRequest::query()
+                ->where('requester_user_id', $user->id)
+                ->where('created_at', '>=', now()->subHour())
+                ->count();
+            if ($hourly >= (int) config('sab-trades.join_limit_per_hour', 30)) {
+                throw TradeException::rateLimited();
+            }
+
+            $request = TradeJoinRequest::query()->create([
+                'listing_id' => $lockedListing->id,
+                'requester_user_id' => $user->id,
+                'owner_user_id' => $lockedListing->owner_user_id,
+                'status' => TradeJoinRequest::STATUS_REQUESTED,
+                'note' => $note,
+                'expires_at' => $lockedListing->expires_at,
+            ]);
+            $this->listings->event($lockedListing, 'join_requested', $user, ['join_public_id' => $request->public_id]);
+            $this->notifications->notify(
+                $owner,
+                'join_requested',
+                'New join request',
+                ($user->display_name ?: $user->username).' asked to join your trade.',
+                $lockedListing,
+                $request,
+                $user,
+            );
+
+            return $request;
+        });
+    }
+
+    /**
+     * @return array{limit: int, sent: int, remaining: int}
+     */
+    public function contactQuota(TradeUser $user, TradeUser $owner): array
+    {
+        return $this->quota->contactQuota($user, $owner);
     }
 
     public function cancel(TradeUser $user, TradeJoinRequest $request): TradeJoinRequest

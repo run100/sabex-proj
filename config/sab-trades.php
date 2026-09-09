@@ -9,7 +9,7 @@ return [
     'post_trade_limit_per_day' => (int) env('POST_TRADE_LIMIT_PER_DAY', 2),
     'join_limit_per_hour' => (int) env('JOIN_LIMIT_PER_HOUR', 30),
     'report_limit_per_day' => (int) env('REPORT_LIMIT_PER_DAY', 20),
-    'message_limit_per_user' => 2,
+    'contact_limit_per_user' => 2,
     'moderator_roblox_subs' => array_values(array_filter(array_map(
         'trim',
         explode(',', (string) env('TRADE_MODERATOR_ROBLOX_SUBS', ''))

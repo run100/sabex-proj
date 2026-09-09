@@ -188,6 +188,7 @@ CREATE TABLE IF NOT EXISTS `seo_trade_join_requests` (
   KEY `idx_trade_join_listing_status` (`listing_id`, `status`, `created_at`),
   KEY `idx_trade_join_requester_status` (`requester_user_id`, `status`, `created_at`),
   KEY `idx_trade_join_owner_status` (`owner_user_id`, `status`),
+  KEY `idx_trade_join_pair` (`requester_user_id`, `owner_user_id`),
   CONSTRAINT `fk_trade_join_listing`
     FOREIGN KEY (`listing_id`) REFERENCES `seo_trade_listings` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_trade_join_requester`

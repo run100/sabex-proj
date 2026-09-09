@@ -151,6 +151,7 @@ trait CreatesTradeTables
             $table->timestamp('rejected_at')->nullable();
             $table->timestamp('cancelled_at')->nullable();
             $table->timestamp('expires_at')->nullable();
+            $table->index(['requester_user_id', 'owner_user_id'], 'idx_trade_join_pair');
         });
         Schema::create('seo_trade_confirmations', function (Blueprint $table): void {
             $table->id();

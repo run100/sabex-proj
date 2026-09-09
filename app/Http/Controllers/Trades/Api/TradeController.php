@@ -144,6 +144,7 @@ class TradeController extends Controller
             return TradeApi::ok([
                 'items' => $items,
                 'message_quota' => $peer ? $notifications->messageQuota($user, $peer) : null,
+                'contact_quota' => $peer ? $notifications->contactQuota($user, $peer) : null,
             ]);
         } catch (TradeException $e) {
             return TradeApi::fromException($e);
@@ -155,7 +156,7 @@ class TradeController extends Controller
         $this->requireSchema();
         try {
             $user = auth('trades')->user();
-            $row = $notifications->send($user, $listings->findPublic($ulid), (string) $request->input('message'));
+            $row = $notifications->send($user, $listings->findPublic($ulid), $request->input('message'));
 
             return TradeApi::ok(['message' => TradePresenter::threadMessage($row->loadMissing('actor'), $user)], 201);
         } catch (TradeException $e) {

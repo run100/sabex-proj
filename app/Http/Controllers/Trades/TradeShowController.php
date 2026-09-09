@@ -36,6 +36,11 @@ class TradeShowController extends Controller
         $user = auth('trades')->user();
         $joinRequests = [];
         $messagePeer = $user ? $notifications->peer($user, $listing) : null;
+        $joinQuota = $user
+            && $listing->isOpen()
+            && (int) $user->id !== (int) $listing->owner_user_id
+            ? $joins->contactQuota($user, $listing->owner)
+            : null;
         if ($user && (int) $user->id === (int) $listing->owner_user_id) {
             $joinRequests = $joins->forListing($user, $listing);
         }
@@ -55,6 +60,7 @@ class TradeShowController extends Controller
             'card' => TradePresenter::listing($listing, true),
             'joinRequests' => $joinRequests,
             'messagePeer' => $messagePeer,
+            'joinQuota' => $joinQuota,
         ]));
     }
 }
