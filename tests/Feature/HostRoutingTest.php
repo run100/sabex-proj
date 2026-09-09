@@ -30,11 +30,12 @@ class HostRoutingTest extends TestCase
         $this->get('/'.config('sab.console_path'))->assertNotFound();
     }
 
-    public function test_admin_host_without_ip_is_404_and_login_works_from_allowlist(): void
+    public function test_admin_host_without_ip_is_403_and_login_works_from_allowlist(): void
     {
         $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.9'])
             ->get('http://x.sabex.lab/login')
-            ->assertNotFound();
+            ->assertForbidden()
+            ->assertSee('Forbidden');
 
         $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
             ->get('http://x.sabex.lab/login')

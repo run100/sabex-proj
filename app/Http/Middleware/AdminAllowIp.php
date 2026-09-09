@@ -11,13 +11,13 @@ class AdminAllowIp
     public function handle(Request $request, Closure $next): Response
     {
         $allowed = config('sab.admin_allow_ips', []);
-        if (! is_array($allowed) || $allowed === []) {
-            abort(404);
-        }
-
         $ip = $this->clientIp($request);
-        if (! in_array($ip, $allowed, true)) {
-            abort(404);
+        if (! is_array($allowed) || $allowed === [] || ! in_array($ip, $allowed, true)) {
+            if ($request->expectsJson()) {
+                abort(403);
+            }
+
+            return response()->view('admin.denied', [], 403);
         }
 
         return $next($request);
