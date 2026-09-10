@@ -180,7 +180,9 @@ class TradeListingService
 
     public function publicOpenCount(): int
     {
-        return $this->basePublicQuery([TradeListing::STATUS_OPEN])->count();
+        return $this->basePublicQuery([TradeListing::STATUS_OPEN])
+            ->where('created_at', '>=', now()->subDays(2))
+            ->count();
     }
 
     /**

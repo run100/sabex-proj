@@ -21,7 +21,7 @@ class MeController extends Controller
             ? $notifications->unreadCount($user)
             : 0;
         $openCount = TradeSchema::ready()
-            ? (int) Cache::remember('trade:open_public_count', 7200, fn () => $listings->publicOpenCount())
+            ? (int) Cache::remember('trade:open_public_recent_count', 7200, fn () => $listings->publicOpenCount())
             : 0;
 
         return TradeApi::ok([

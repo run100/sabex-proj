@@ -72,6 +72,23 @@ class MeOpenListingsCountTest extends TestCase
             ->assertJsonPath('data.open_listings_count', 1);
     }
 
+    public function test_me_counts_only_open_listings_created_in_the_last_two_days(): void
+    {
+        $oldOwner = $this->tradeUser('1', 'Old');
+        $newOwner = $this->tradeUser('2', 'New');
+        $listings = app(TradeListingService::class);
+        $old = $listings->create($oldOwner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+        $listings->create($newOwner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+
+        $old->created_at = now()->subDays(3);
+        $old->save();
+        Cache::flush();
+
+        $this->getJson('http://www.sabex.lab/api/v1/me')
+            ->assertOk()
+            ->assertJsonPath('data.open_listings_count', 1);
+    }
+
     public function test_me_reuses_cached_open_listings_count_for_two_hours(): void
     {
         $first = $this->tradeUser('1', 'First');
@@ -88,7 +105,7 @@ class MeOpenListingsCountTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.open_listings_count', 1);
 
-        Cache::forget('trade:open_public_count');
+        Cache::forget('trade:open_public_recent_count');
 
         $this->getJson('http://www.sabex.lab/api/v1/me')
             ->assertOk()
