@@ -215,6 +215,8 @@
   $calculatorItemHref = rtrim($urlPrefix ?? '', '/') . '/' . \App\Services\Seo\SabRenderService::PAGE_TRADING_CALCULATOR
       . '?item=' . rawurlencode((string) $item->slug);
   $hasSnapshot = $hasSnapshot || $valueDisplay['kind'] !== 'calculator' || $demandDisplay !== '';
+  $priceHistoryUrl = $priceHistoryUrl
+    ?? (rtrim((string) ($urlPrefix ?? ''), '/') . '/products/' . \App\Services\Seo\SabRenderService::productPublicSlug((string) $item->slug) . '/price-history.json');
   $priceHistorySource = $showMutationPriceSection
     ? ($initialMutation['priceHistory'] ?? [])
     : ($priceHistory ?? []);
@@ -796,7 +798,7 @@
   </div>
 </section>
 
-@if($showMutationPriceSection || $priceHistoryLatestValue !== null)
+@if($showMutationPriceSection || $priceHistoryLatestValue !== null || !empty($priceHistoryUrl))
 <section id="price-history" class="mb-8 scroll-mt-32" style="scroll-margin-top:8rem">
   <div class="rounded-2xl border border-white/10 bg-slate-900/80 p-5 shadow-[0_20px_60px_rgba(0,0,0,.22)]">
     @if($showMutationPriceSection)
@@ -869,17 +871,8 @@
     <div class="mb-4 flex items-start justify-between gap-4">
       <div class="text-xs font-black uppercase tracking-[.18em] text-slate-500">30D PRICE</div>
       <div class="flex items-center gap-3">
-        @if($priceHistoryChange !== null)
-        <span id="sabPriceHistorySignal" class="rounded-full border px-3 py-1 text-xs font-black {{ $priceHistoryChange >= 0 ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-rose-400/40 bg-rose-400/10 text-rose-300' }}">
-          {{ $priceHistoryChange >= 0 ? 'High' : 'Low' }}
-        </span>
-        <span id="sabPriceHistoryPct" class="text-lg font-black {{ $priceHistoryChange >= 0 ? 'text-emerald-300' : 'text-rose-300' }}">
-          {{ $priceHistoryChange >= 0 ? '+' : '' }}{{ number_format($priceHistoryChange, 1) }}%
-        </span>
-        @else
         <span id="sabPriceHistorySignal" class="rounded-full border px-3 py-1 text-xs font-black hidden"></span>
         <span id="sabPriceHistoryPct" class="text-lg font-black hidden"></span>
-        @endif
       </div>
     </div>
 
@@ -888,28 +881,14 @@
       class="block h-28 w-full"
       width="720"
       height="112"
-      @if($showMutationPriceSection)
-      data-mutations='@json($mpdMutations)'
-      @else
-      data-price-history='@json($priceHistoryRows->values()->all())'
-      @endif
+      data-price-history-url="{{ $priceHistoryUrl }}"
       aria-label="{{ $displayName }} 30D price history"
     ></canvas>
     <div id="sabPriceHistoryEmpty" class="sab-item-chart-empty">No price history yet</div>
 
     <div class="mt-4 flex items-center justify-between gap-4 text-sm">
-      <span id="sabPriceHistoryRange" class="font-semibold text-slate-500">
-        @if($pricePointCount === 1 && $priceHistoryDate)
-        1 price point · {{ \Illuminate\Support\Carbon::parse($priceHistoryDate)->format('m-d') }}
-        @elseif($pricePointCount > 1)
-        {{ $pricePointCount }} days
-        @endif
-      </span>
-      <span id="sabPriceHistoryCurVal" class="font-black text-amber-300">
-        @if($priceHistoryLatestValue !== null)
-        {{ number_format($priceHistoryLatestValue, $priceHistoryLatestValue >= 1000 ? 0 : 2) }} ROBUX
-        @endif
-      </span>
+      <span id="sabPriceHistoryRange" class="font-semibold text-slate-500"></span>
+      <span id="sabPriceHistoryCurVal" class="font-black text-amber-300"></span>
     </div>
   </div>
 </section>
@@ -1417,20 +1396,8 @@
     var mutTabsEl = document.getElementById('sabItemMutTabs');
 
     var mutations = [];
-    try {
-      mutations = JSON.parse(canvas.getAttribute('data-mutations') || '[]');
-    } catch (e) {
-      mutations = [];
-    }
-
     var legacyHistory = [];
-    if (mutations.length === 0) {
-      try {
-        legacyHistory = JSON.parse(canvas.getAttribute('data-price-history') || '[]');
-      } catch (e2) {
-        legacyHistory = [];
-      }
-    }
+    var historyUrl = canvas.getAttribute('data-price-history-url') || '';
 
     function normalizeHistory(raw) {
       return (raw || [])
@@ -1608,18 +1575,16 @@
       });
     }
 
-    var currentHistory = mutations.length > 0
-      ? normalizeHistory(mutations[0].priceHistory)
-      : normalizeHistory(legacyHistory);
-
-    var currentRobux = mutations.length > 0 ? mutations[0].robuxValue : null;
+    var currentHistory = [];
+    var currentRobux = null;
 
     function renderCurrent() {
       updateMeta(currentHistory, currentRobux);
       drawHistory(currentHistory);
     }
 
-    if (mutTabsEl && mutations.length > 0) {
+    function bindMutationTabs() {
+      if (!mutTabsEl || mutations.length === 0) return;
       mutTabsEl.querySelectorAll('.sab-item-mut-tab').forEach(function (btn) {
         btn.addEventListener('click', function () {
           var idx = Number(btn.getAttribute('data-mut-idx'));
@@ -1633,11 +1598,28 @@
       });
     }
 
-    if (currentHistory.length === 0 && currentRobux == null && legacyHistory.length === 0) {
-      return;
+    function applyPayload(data) {
+      mutations = (data && Array.isArray(data.mutations)) ? data.mutations : [];
+      if (mutations.length > 0) {
+        currentHistory = normalizeHistory(mutations[0].priceHistory);
+        currentRobux = mutations[0].robuxValue;
+      } else {
+        currentHistory = normalizeHistory(legacyHistory);
+        currentRobux = null;
+      }
+      bindMutationTabs();
+      renderCurrent();
     }
 
-    renderCurrent();
+    if (historyUrl) {
+      fetch(historyUrl, { credentials: 'omit' })
+        .then(function (response) { return response.ok ? response.json() : { mutations: [] }; })
+        .then(applyPayload)
+        .catch(function () { applyPayload({ mutations: [] }); });
+    } else {
+      applyPayload({ mutations: [] });
+    }
+
     window.addEventListener('resize', renderCurrent, { passive: true });
   })();
 </script>

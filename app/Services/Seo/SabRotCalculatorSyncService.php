@@ -10,7 +10,9 @@ use App\Models\SeoItemVariant;
 use App\Models\SeoSite;
 use App\Models\SeoValueSource;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class SabRotCalculatorSyncService
@@ -25,9 +27,17 @@ class SabRotCalculatorSyncService
 
     private const META_PATH = 'app/seo/sab-calculator-meta.json';
 
+    private const BACKFILL_CHUNK_SIZE = 50;
+
     private ?int $nextObservationId = null;
 
     private int $imagesDownloaded = 0;
+
+    /** @var callable(string): void|null */
+    private $onProgress = null;
+
+    /** @var Collection<string, array<string, mixed>>|null */
+    private ?Collection $remoteItemsBySlugCache = null;
 
     public static function calculatorImageRoot(): string
     {
@@ -69,11 +79,13 @@ class SabRotCalculatorSyncService
      *     meta_path: string
      * }
      */
-    public function refresh(): array
+    public function refresh(?callable $onProgress = null): array
     {
+        $this->onProgress = $onProgress;
         $this->ensureCliMemoryLimit();
         $startedAt = microtime(true);
         $this->imagesDownloaded = 0;
+        $this->reportProgress('Starting SAB calculator refresh...');
 
         $site = SeoSite::query()->firstOrCreate(
             ['slug' => SabRenderService::SITE_SLUG],
@@ -103,6 +115,7 @@ class SabRotCalculatorSyncService
         );
         $source = SeoValueSource::query()->where('slug', self::SOURCE_SLUG)->firstOrFail();
 
+        $this->reportProgress('Fetching catalog from rot.rocks...');
         $brainrots = $this->namedRows($this->fetchJson('/api/brainrots')['brainrots'] ?? []);
         $mutations = $this->namedRows($this->fetchJson('/api/mutations')['mutations'] ?? []);
         $traitsPayload = $this->fetchJson('/api/traits');
@@ -131,6 +144,13 @@ class SabRotCalculatorSyncService
             'remote_mutations' => count($mutations),
             'remote_traits' => count($traits),
         ];
+        $this->reportProgress(
+            'Fetched remote catalog: brainrots='.$counts['remote_brainrots']
+            .' mutations='.$counts['remote_mutations']
+            .' traits='.$counts['remote_traits']
+        );
+        $total = $counts['remote_brainrots'];
+        $this->reportProgress('Processing brainrots: 0/'.$total);
 
         foreach ($brainrots as $row) {
             if (! is_array($row) || trim((string) ($row['name'] ?? '')) === '') {
@@ -198,11 +218,21 @@ class SabRotCalculatorSyncService
                 $counts['json_files']++;
             }
             $counts['items']++;
+            if ($counts['items'] % 50 === 0 || $counts['items'] === $total) {
+                $this->reportProgress(
+                    'Processing brainrots: '.$counts['items'].'/'.$total
+                    .' (new so far: '.$counts['new_items'].')'
+                );
+            }
         }
 
+        $this->reportProgress('Downloading missing catalog images...');
         $this->downloadMissingCatalogImages($mutations, $traits);
+        $this->reportProgress('Images checked: downloaded='.$this->imagesDownloaded);
+        $this->reportProgress('Writing calculator meta...');
         $syncedAt = now()->toIso8601String();
         $this->saveCalculatorMeta($traits, $mutations, $streakMultipliers, $syncedAt);
+        $this->reportProgress('Meta written: '.self::calculatorMetaPath());
         $this->storeStreakMultipliers($site, $streakMultipliers);
         foreach ($traits as $trait) {
             $slug = Str::slug((string) $trait['name']);
@@ -216,6 +246,192 @@ class SabRotCalculatorSyncService
         $counts['meta_path'] = self::calculatorMetaPath();
 
         return $counts;
+    }
+
+    /**
+     * Resolve local item slugs eligible for rot.rocks price-history backfill.
+     *
+     * @return list<string>
+     */
+    public function resolveBackfillSlugs(): array
+    {
+        $game = $this->resolveStealABrainrotGame();
+        $remoteItems = $this->remoteItemsBySlug();
+
+        return SeoItem::query()
+            ->where('seo_game_id', $game->id)
+            ->orderBy('slug')
+            ->get(['id', 'slug', 'attributes_json'])
+            ->filter(function (SeoItem $item) use ($remoteItems): bool {
+                $rotId = trim((string) data_get($item->attributes_json, 'rot_rocks.rot_id'));
+
+                return $rotId !== '' && $remoteItems->has($item->slug);
+            })
+            ->pluck('slug')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Backfill rot.rocks price-history points into sab-price-history/{slug}.json.
+     *
+     * @param  list<string>  $slugs
+     * @param  callable(string): void|null  $onProgress
+     * @return array{
+     *     written: int,
+     *     skipped: int,
+     *     items: list<array{slug: string, status: string, reason?: string, points?: int, latest?: float|int|null}>
+     * }
+     */
+    public function backfillPriceHistory(array $slugs, int $sleepMs = 0, ?callable $onProgress = null): array
+    {
+        $this->onProgress = $onProgress;
+        $slugs = array_values(array_filter(array_map(
+            fn ($slug): string => trim((string) $slug),
+            $slugs
+        )));
+
+        $this->reportBackfillProgress('Starting backfill ('.count($slugs).' slugs)...');
+        $this->reportBackfillProgress('Fetching remote catalog...');
+
+        $source = SeoValueSource::query()->where('slug', self::SOURCE_SLUG)->firstOrFail();
+        $game = $this->resolveStealABrainrotGame();
+        $remoteItems = $this->remoteItemsBySlug();
+        $writer = app(SabPriceHistoryWriter::class);
+
+        $written = 0;
+        $skipped = 0;
+        $itemResults = [];
+        $total = count($slugs);
+        $chunks = array_chunk($slugs, self::BACKFILL_CHUNK_SIZE);
+        $batchCount = count($chunks);
+        $processed = 0;
+
+        foreach ($chunks as $batchIndex => $chunk) {
+            $from = $processed + 1;
+            $to = $processed + count($chunk);
+            $this->reportBackfillProgress('Batch '.($batchIndex + 1).'/'.$batchCount.' (slugs '.$from.'–'.$to.')...');
+
+            $items = SeoItem::query()
+                ->where('seo_game_id', $game->id)
+                ->whereIn('slug', $chunk)
+                ->select(['id', 'slug', 'attributes_json'])
+                ->with(['variants' => function ($query): void {
+                    $query->where(function ($query): void {
+                        $query->where('variant_key', 'base')
+                            ->orWhere('variant_type', 'base');
+                    })->select(['id', 'seo_item_id', 'variant_key', 'variant_type']);
+                }])
+                ->get()
+                ->keyBy('slug');
+
+            foreach ($chunk as $slug) {
+                $processed++;
+                $item = $items->get($slug);
+                if (! $item) {
+                    $skipped++;
+                    $itemResults[] = ['slug' => $slug, 'status' => 'skipped', 'reason' => 'local_item_missing'];
+                    $this->reportBackfillProgress('[skip] '.$slug.': local_item_missing');
+                    $this->reportBackfillProgress('Processing '.$processed.'/'.$total);
+                    continue;
+                }
+
+                $variant = $item->variants->firstWhere('variant_key', 'base')
+                    ?? $item->variants->firstWhere('variant_type', 'base');
+                if (! $variant) {
+                    $skipped++;
+                    $itemResults[] = ['slug' => $slug, 'status' => 'skipped', 'reason' => 'no_base_variant'];
+                    $this->reportBackfillProgress('[skip] '.$slug.': no_base_variant');
+                    $this->reportBackfillProgress('Processing '.$processed.'/'.$total);
+                    continue;
+                }
+
+                $remote = $remoteItems->get($slug);
+                $rotId = (string) (data_get($item->attributes_json, 'rot_rocks.rot_id') ?: (is_array($remote) ? ($remote['id'] ?? '') : ''));
+                if ($rotId === '') {
+                    $skipped++;
+                    $itemResults[] = ['slug' => $slug, 'status' => 'skipped', 'reason' => 'no_rot_id'];
+                    $this->reportBackfillProgress('[skip] '.$slug.': no_rot_id');
+                    $this->reportBackfillProgress('Processing '.$processed.'/'.$total);
+                    continue;
+                }
+
+                try {
+                    $payload = $this->fetchJson('/api/brainrots/'.$rotId.'/price-history');
+                } catch (\Throwable $e) {
+                    $reason = 'fetch_failed: '.$e->getMessage();
+                    $skipped++;
+                    $itemResults[] = ['slug' => $slug, 'status' => 'skipped', 'reason' => $reason];
+                    $this->reportBackfillProgress('[skip] '.$slug.': '.$reason);
+                    $this->reportBackfillProgress('Processing '.$processed.'/'.$total);
+                    continue;
+                }
+                if ($sleepMs > 0) {
+                    usleep($sleepMs * 1000);
+                }
+
+                $history = is_array($payload['history'] ?? null) ? $payload['history'] : [];
+                $points = [];
+                foreach ($history as $row) {
+                    if (! is_array($row) || ! isset($row['date'], $row['value']) || ! is_numeric($row['value'])) {
+                        continue;
+                    }
+                    $points[] = [
+                        'date' => (string) $row['date'],
+                        'value' => (float) $row['value'],
+                    ];
+                }
+                if ($points === []) {
+                    $skipped++;
+                    $itemResults[] = ['slug' => $slug, 'status' => 'skipped', 'reason' => 'empty_history'];
+                    $this->reportBackfillProgress('[skip] '.$slug.': empty_history');
+                    $this->reportBackfillProgress('Processing '.$processed.'/'.$total);
+                    continue;
+                }
+
+                $writer->mergeHistory((string) $item->slug, (int) $variant->id, $points);
+                $written++;
+
+                $latestPrice = null;
+                if (isset($payload['latestPrice']) && is_numeric($payload['latestPrice'])) {
+                    $latestPrice = (float) $payload['latestPrice'];
+                    $demand = isset($payload['demand']) ? (string) $payload['demand'] : '';
+                    SeoItemCurrentValue::query()->updateOrCreate(
+                        [
+                            'seo_item_variant_id' => $variant->id,
+                            'seo_value_source_id' => $source->id,
+                        ],
+                        [
+                            'collected_at' => now(),
+                            'changed_at' => now(),
+                            'exist_count_raw' => '',
+                            'value_raw' => (string) $latestPrice,
+                            'value_normalized' => $latestPrice,
+                            'currency' => 'ROBUX',
+                            'demand' => $demand,
+                            'confidence' => 90,
+                            'source_payload_hash' => sha1(json_encode([$variant->id, $latestPrice, $demand, 'rot-rocks-price-history-current'])),
+                        ]
+                    );
+                }
+
+                $itemResults[] = [
+                    'slug' => $slug,
+                    'status' => 'ok',
+                    'points' => count($points),
+                    'latest' => $latestPrice,
+                ];
+                $latest = $latestPrice !== null ? ', latest='.$latestPrice : '';
+                $this->reportBackfillProgress('[ok] '.$slug.': '.count($points).' points'.$latest);
+                $this->reportBackfillProgress('Processing '.$processed.'/'.$total);
+            }
+        }
+
+        return [
+            'written' => $written,
+            'skipped' => $skipped,
+            'items' => $itemResults,
+        ];
     }
 
     /**
@@ -651,6 +867,54 @@ class SabRotCalculatorSyncService
     /**
      * @return array<string, mixed>
      */
+    /**
+     * @return Collection<string, array<string, mixed>>
+     */
+    private function remoteItemsBySlug(): Collection
+    {
+        if ($this->remoteItemsBySlugCache instanceof Collection) {
+            return $this->remoteItemsBySlugCache;
+        }
+
+        $remoteItems = [];
+        foreach ($this->namedRows($this->fetchJson('/api/brainrots')['brainrots'] ?? []) as $row) {
+            $slug = trim((string) ($row['slug'] ?? ''));
+            $slug = $slug !== '' ? Str::slug($slug) : Str::slug((string) $row['name']);
+            if ($slug === '') {
+                continue;
+            }
+            $remoteItems[$slug] = $row;
+        }
+
+        return $this->remoteItemsBySlugCache = collect($remoteItems);
+    }
+
+    private function resolveStealABrainrotGame(): SeoGame
+    {
+        $site = SeoSite::query()->where('slug', SabRenderService::SITE_SLUG)->firstOrFail();
+
+        return SeoGame::query()
+            ->where('seo_site_id', $site->id)
+            ->where('slug', 'steal-a-brainrot')
+            ->firstOrFail();
+    }
+
+    private function reportProgress(string $message): void
+    {
+        if (is_callable($this->onProgress)) {
+            ($this->onProgress)($message);
+        }
+        Log::info('seo.sab-calculator-refresh.progress', ['message' => $message]);
+    }
+
+    private function reportBackfillProgress(string $message): void
+    {
+        if (is_callable($this->onProgress)) {
+            ($this->onProgress)($message);
+        }
+        Log::info('seo.sab-price-history-backfill.progress', ['message' => $message]);
+    }
+
     private function fetchJson(string $path): array
     {
         $payload = Http::retry(3, 1000)

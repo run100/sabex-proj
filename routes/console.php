@@ -26,7 +26,9 @@ Artisan::command('seo:trade-expire', function () {
 
 Artisan::command('seo:sab-calculator-refresh', function () {
     try {
-        $result = app(SabRotCalculatorSyncService::class)->refresh();
+        $result = app(SabRotCalculatorSyncService::class)->refresh(
+            fn (string $message) => $this->line($message),
+        );
         $this->info('SAB calculator refresh completed.');
         $this->line('synced_at: '.$result['synced_at']);
         $this->line('duration_ms: '.$result['duration_ms']);
@@ -44,6 +46,7 @@ Artisan::command('seo:sab-calculator-refresh', function () {
         $this->line('Meta: '.$result['meta_path']);
         Log::info('seo.sab-calculator-refresh', $result);
     } catch (\Throwable $e) {
+        Log::error('seo.sab-calculator-refresh', ['error' => $e->getMessage()]);
         $this->error($e->getMessage());
 
         return 1;
@@ -51,6 +54,46 @@ Artisan::command('seo:sab-calculator-refresh', function () {
 
     return 0;
 })->purpose('Fetch rot.rocks catalog and prices, upsert local calculator data, and refresh Last update');
+
+Artisan::command('seo:sab-price-history-backfill {--slug=* : Item slug to backfill; omit to process all eligible items} {--all : Same as omitting --slug (kept for compatibility)} {--sleep-ms=150 : Milliseconds to wait after each price-history API request} {--limit=0 : Process only the first N slugs (0 = no limit)}', function () {
+    $service = app(SabRotCalculatorSyncService::class);
+    $slugs = array_values(array_filter(array_map(
+        fn ($slug): string => trim((string) $slug),
+        (array) $this->option('slug')
+    )));
+
+    if ($slugs === []) {
+        $slugs = $service->resolveBackfillSlugs();
+    }
+
+    $limit = max(0, (int) $this->option('limit'));
+    if ($limit > 0) {
+        $slugs = array_slice($slugs, 0, $limit);
+    }
+
+    $sleepMs = max(0, (int) $this->option('sleep-ms'));
+
+    try {
+        $result = $service->backfillPriceHistory(
+            $slugs,
+            $sleepMs,
+            fn (string $message) => $this->line($message),
+        );
+        $this->info('Written='.(int) ($result['written'] ?? 0).' skipped='.(int) ($result['skipped'] ?? 0));
+        Log::info('seo.sab-price-history-backfill', [
+            'written' => $result['written'] ?? 0,
+            'skipped' => $result['skipped'] ?? 0,
+            'item_count' => count($result['items'] ?? []),
+        ]);
+    } catch (\Throwable $e) {
+        Log::error('seo.sab-price-history-backfill', ['error' => $e->getMessage()]);
+        $this->error($e->getMessage());
+
+        return 1;
+    }
+
+    return 0;
+})->purpose('Backfill rot.rocks price-history points into sab-price-history JSON files');
 
 Artisan::command('seo:sab-geoflow-sync {--dry-run} {--files-only} {--tables-only}', function () {
     $files = app(SabGeoflowFileSyncService::class);

@@ -42,6 +42,62 @@ class SabPriceHistoryWriter
     }
 
     /**
+     * Merge a historical series for one variant. Other variant keys are kept.
+     *
+     * @param  list<array{date?: mixed, value?: mixed}>  $points
+     * @return array{slug: string, variants: array<string, list<array{date: string, value: float}>>}
+     */
+    public function mergeHistory(string $slug, int $variantId, array $points): array
+    {
+        $slug = $this->safeSlug($slug);
+        if ($slug === null) {
+            throw new \InvalidArgumentException('Invalid price-history slug.');
+        }
+        if ($variantId < 1) {
+            throw new \InvalidArgumentException('Invalid price-history variant id.');
+        }
+
+        $payload = $this->read($slug);
+        $key = (string) $variantId;
+        $series = $payload['variants'][$key] ?? [];
+        foreach ($points as $point) {
+            if (! is_array($point) || ! isset($point['date'], $point['value']) || ! is_numeric($point['value'])) {
+                continue;
+            }
+            $date = Carbon::parse((string) $point['date'])->toDateString();
+            $series = $this->upsertDay($series, $date, round((float) $point['value'], 4));
+        }
+        $payload['variants'][$key] = $series;
+        $this->write($slug, $payload);
+
+        return $payload;
+    }
+
+    /**
+     * @return array{slug: string, variants: array<string, list<array{date: string, value: float}>>}
+     */
+    public function read(string $slug): array
+    {
+        $safe = $this->safeSlug($slug);
+        if ($safe === null) {
+            return ['slug' => '', 'variants' => []];
+        }
+
+        $path = $this->directory().'/'.$safe.'.json';
+        if (! File::isFile($path)) {
+            return ['slug' => $safe, 'variants' => []];
+        }
+
+        $decoded = json_decode((string) File::get($path), true);
+        $variants = is_array($decoded) ? ($decoded['variants'] ?? []) : [];
+        if (! is_array($variants)) {
+            $variants = [];
+        }
+
+        return ['slug' => $safe, 'variants' => $variants];
+    }
+
+    /**
      * @param  list<array{date: string, value: float}>  $points
      * @return list<array{date: string, value: float}>
      */
@@ -68,25 +124,6 @@ class SabPriceHistoryWriter
     public function directory(): string
     {
         return storage_path('app/seo/sab-price-history');
-    }
-
-    /**
-     * @return array{slug: string, variants: array<string, list<array{date: string, value: float}>>}
-     */
-    private function read(string $slug): array
-    {
-        $path = $this->directory().'/'.$slug.'.json';
-        if (! File::isFile($path)) {
-            return ['slug' => $slug, 'variants' => []];
-        }
-
-        $decoded = json_decode((string) File::get($path), true);
-        $variants = is_array($decoded) ? ($decoded['variants'] ?? []) : [];
-        if (! is_array($variants)) {
-            $variants = [];
-        }
-
-        return ['slug' => $slug, 'variants' => $variants];
     }
 
     /**

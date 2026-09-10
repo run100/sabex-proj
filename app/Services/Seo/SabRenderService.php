@@ -3789,6 +3789,44 @@ class SabRenderService
         ];
     }
 
+    /**
+     * Public JSON payload for product 30D price charts.
+     *
+     * @return array{found: bool, slug: string, mutations: list<array<string, mixed>>}
+     */
+    public function itemPriceHistoryApiPayload(string $slug): array
+    {
+        $slug = strtolower(trim($slug));
+        $site = SeoSite::query()->where('slug', self::SITE_SLUG)->first();
+        if ($site === null) {
+            return ['found' => false, 'slug' => $slug, 'mutations' => []];
+        }
+        $game = SeoGame::query()
+            ->where('seo_site_id', $site->id)
+            ->where('slug', self::GAME_SLUG)
+            ->first();
+        if ($game === null) {
+            return ['found' => false, 'slug' => $slug, 'mutations' => []];
+        }
+
+        $item = SeoItem::query()
+            ->where('seo_game_id', $game->id)
+            ->where('slug', $slug)
+            ->with(['variants.currentValues.source'])
+            ->first();
+        if ($item === null) {
+            return ['found' => false, 'slug' => $slug, 'mutations' => []];
+        }
+
+        $payload = $this->itemMutationPricePayload($item);
+
+        return [
+            'found' => true,
+            'slug' => (string) $item->slug,
+            'mutations' => is_array($payload['mutations'] ?? null) ? $payload['mutations'] : [],
+        ];
+    }
+
     public function existCountGalleryViewContext(string $locale = self::DEFAULT_LOCALE): array
     {
         $locale = self::DEFAULT_LOCALE;
@@ -3845,6 +3883,7 @@ class SabRenderService
         $priceHistory  = $mutationPriceData['mutations'][0]['priceHistory']
             ?? $this->brainrotPriceHistoryForItem($item);
         $calculatorBrainrot = $this->calculatorBrainrotForItem($item, $site);
+        $priceHistoryUrl = rtrim($urlPrefix, '/').'/products/'.self::productPublicSlug($item->slug).'/price-history.json';
         $itemUrl = $this->localePublicUrl($baseUrl, $locale, 'products/' . self::productPublicSlug($item->slug) . '.html');
         $homeUrl = $this->localePublicUrl($baseUrl, $locale, 'index.html');
         $breadcrumbCurrent = "{$displayName} {$t['item_page_exist_count_label']}";
@@ -3866,6 +3905,7 @@ class SabRenderService
             'currentValues'  => $currentValues,
             'history'        => $history,
             'priceHistory'   => $priceHistory,
+            'priceHistoryUrl' => $priceHistoryUrl,
             'mutationPriceData' => $mutationPriceData,
             'calculatorBrainrot' => $calculatorBrainrot,
             'websiteJsonLd'  => $this->websiteJsonLd($baseUrl, $seoDescription),

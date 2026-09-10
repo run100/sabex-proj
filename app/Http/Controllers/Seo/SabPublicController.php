@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Seo;
 use App\Http\Controllers\Controller;
 use App\Services\Seo\SabRenderService;
 use App\Services\Seo\SabWikiPageDefinitions;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\View\View;
@@ -76,6 +77,20 @@ class SabPublicController extends Controller
     public function calculator(Request $request, SabRenderService $sabRender, ?string $locale = null): View
     {
         return view('seo.sab.calculator', $sabRender->calculatorViewContext($this->locale($request, $locale)));
+    }
+
+    public function itemPriceHistory(string $slug, SabRenderService $sabRender): JsonResponse
+    {
+        $slug = preg_replace('/\.html$/', '', $slug);
+        $payload = $sabRender->itemPriceHistoryApiPayload((string) $slug);
+        abort_unless($payload['found'], 404);
+
+        return response()->json([
+            'slug' => $payload['slug'],
+            'mutations' => $payload['mutations'],
+        ], 200, [
+            'Cache-Control' => 'public, max-age=300',
+        ]);
     }
 
     public function item(Request $request, string $slug, SabRenderService $sabRender): View

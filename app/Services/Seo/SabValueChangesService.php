@@ -3,6 +3,7 @@
 namespace App\Services\Seo;
 
 use App\Models\SeoGame;
+use App\Models\SeoItem;
 use App\Models\SeoSite;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +35,9 @@ class SabValueChangesService
         $days = $this->normalizeDays($days);
         $direction = $this->normalizeDirection($direction);
         $sort = $this->normalizeSort($sort);
+        if ($days === 1) {
+            return $this->changesFromPriceHistoryJson($game, $direction, $sort, $limit);
+        }
         $since = Carbon::now()->subDays($days)->startOfDay();
 
         $ranked = DB::table('seo_item_observations as observation')
@@ -208,6 +212,115 @@ class SabValueChangesService
             ->where('seo_site_id', $site->id)
             ->where('slug', self::GAME_SLUG)
             ->first();
+    }
+
+    /**
+     * Today's movers from sab-price-history JSON: today vs the previous dated point.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function changesFromPriceHistoryJson(SeoGame $game, ?string $direction, string $sort, int $limit): array
+    {
+        $today = Carbon::now()->toDateString();
+        $writer = app(SabPriceHistoryWriter::class);
+        $rows = [];
+
+        $items = SeoItem::query()
+            ->where('seo_game_id', $game->id)
+            ->where('is_listed', true)
+            ->with(['variants' => fn ($query) => $query->where('variant_key', 'base')])
+            ->get(['id', 'slug', 'name', 'display_name', 'rarity']);
+
+        foreach ($items as $item) {
+            $base = $item->variants->first();
+            if ($base === null) {
+                continue;
+            }
+            $series = $writer->read((string) $item->slug)['variants'][(string) $base->id] ?? [];
+            $points = [];
+            foreach (is_array($series) ? $series : [] as $point) {
+                if (! is_array($point) || ! isset($point['date'], $point['value']) || ! is_numeric($point['value'])) {
+                    continue;
+                }
+                $points[] = [
+                    'date' => (string) $point['date'],
+                    'value' => (float) $point['value'],
+                ];
+            }
+            usort($points, fn (array $a, array $b): int => strcmp($a['date'], $b['date']));
+
+            $after = null;
+            $before = null;
+            foreach ($points as $point) {
+                if ($point['date'] === $today) {
+                    $after = $point;
+                    continue;
+                }
+                if ($point['date'] < $today) {
+                    $before = $point;
+                }
+            }
+            if ($after === null || $before === null) {
+                continue;
+            }
+            if (round($after['value'], 4) === round($before['value'], 4)) {
+                continue;
+            }
+
+            $mapped = $this->mapChangeFromValues(
+                $item,
+                $before['value'],
+                $after['value'],
+                Carbon::parse($after['date'])->toIso8601String(),
+            );
+            if ($direction === 'up' && ($mapped['delta'] ?? 0) <= 0) {
+                continue;
+            }
+            if ($direction === 'down' && ($mapped['delta'] ?? 0) >= 0) {
+                continue;
+            }
+            $rows[] = $mapped;
+        }
+
+        usort($rows, function (array $left, array $right) use ($sort): int {
+            if ($sort === 'biggest') {
+                return abs((float) ($right['delta'] ?? 0)) <=> abs((float) ($left['delta'] ?? 0));
+            }
+
+            return strcmp((string) ($right['observedAt'] ?? ''), (string) ($left['observedAt'] ?? ''));
+        });
+
+        return array_slice($rows, 0, max(1, $limit));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapChangeFromValues(SeoItem $item, float $beforeNum, float $afterNum, string $observedAt): array
+    {
+        $delta = round($afterNum - $beforeNum, 4);
+        $deltaDrop = $afterNum < $beforeNum ? round($beforeNum - $afterNum, 4) : 0.0;
+        $deltaPct = $beforeNum != 0.0 ? round(($delta / $beforeNum) * 100, 1) : null;
+
+        return [
+            'itemName' => trim((string) ($item->display_name ?? '')) ?: (string) $item->name,
+            'itemSlug' => (string) $item->slug,
+            'itemRarity' => (string) ($item->rarity ?? ''),
+            'sourceLabel' => 'rot.rocks calculator',
+            'observedAt' => $observedAt,
+            'observedLabel' => Carbon::parse($observedAt)->format('M j, Y'),
+            'beforeValue' => $beforeNum,
+            'afterValue' => $afterNum,
+            'before' => $this->formatValueLabel((string) $beforeNum, $beforeNum),
+            'after' => $this->formatValueLabel((string) $afterNum, $afterNum),
+            'delta' => $delta,
+            'deltaDrop' => $deltaDrop,
+            'deltaLabel' => $this->formatDeltaLabel($delta),
+            'deltaPct' => $deltaPct,
+            'deltaPctLabel' => $deltaPct === null ? '—' : (($deltaPct > 0 ? '+' : '').$deltaPct.'%'),
+            'demandBefore' => '',
+            'demandAfter' => '',
+        ];
     }
 
     /**

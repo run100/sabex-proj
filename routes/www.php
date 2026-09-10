@@ -15,6 +15,8 @@ if ($consolePath !== '') {
     Route::any('/'.$consolePath.'/{any?}', fn () => abort(404))->where('any', '.*');
 }
 
+Route::get('/products/{slug}/price-history.json', [SabPublicController::class, 'itemPriceHistory']);
+
 Route::middleware('cache.public.seo')->group(function () use ($localePattern): void {
     Route::get('/robots.txt', [SabPublicController::class, 'robots']);
     Route::get('/sitemap.xml', [SabPublicController::class, 'sitemap']);

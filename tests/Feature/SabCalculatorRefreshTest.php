@@ -155,6 +155,8 @@ class SabCalculatorRefreshTest extends TestCase
         ]);
 
         $this->artisan('seo:sab-calculator-refresh')
+            ->expectsOutput('Starting SAB calculator refresh...')
+            ->expectsOutputToContain('Fetched remote catalog')
             ->expectsOutput('SAB calculator refresh completed.')
             ->expectsOutput('Remote: brainrots=2 mutations=1 traits=1')
             ->expectsOutput('Items: processed=2 new=1')
