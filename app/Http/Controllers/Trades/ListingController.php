@@ -9,6 +9,7 @@ use App\Services\Trades\TradeListingService;
 use App\Support\TradeCanonical;
 use App\Support\TradePaths;
 use App\Support\TradeQueryRules;
+use App\Support\TradeSeo;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -44,6 +45,7 @@ class ListingController extends Controller
         $seo = TradeCanonical::forList(TradePaths::marketplace(), $request);
         $page['canonical'] = $seo['canonical'];
         $page['robots'] = $seo['robots'];
+        $page['jsonLd'] = TradeSeo::breadcrumbJsonLd();
 
         return view('trades.listings', $page);
     }

@@ -162,4 +162,29 @@ class TradeSeoTest extends TestCase
         $this->assertStringContainsString('What is Steal a Brainrot trades?', $json);
         $this->assertStringContainsString('exist count', $json);
     }
+
+    public function test_breadcrumb_json_ld_has_home_and_trades(): void
+    {
+        config(['sab.hosts.www' => 'www.sabex.lab']);
+
+        $html = TradeSeo::breadcrumbJsonLd();
+
+        $this->assertStringContainsString('<script type="application/ld+json">', $html);
+        $this->assertStringContainsString('"@type":"BreadcrumbList"', $html);
+        $this->assertStringContainsString('"name":"Home"', $html);
+        $this->assertStringContainsString('"name":"Trades"', $html);
+        $this->assertStringContainsString('/trading', $html);
+        $this->assertStringNotContainsString('"position":3', $html);
+    }
+
+    public function test_breadcrumb_json_ld_adds_current_page(): void
+    {
+        config(['sab.hosts.www' => 'www.sabex.lab']);
+
+        $html = TradeSeo::breadcrumbJsonLd('Create Trade Ad', 'http://www.sabex.lab/trading/new');
+
+        $this->assertStringContainsString('"position":3', $html);
+        $this->assertStringContainsString('"name":"Create Trade Ad"', $html);
+        $this->assertStringContainsString('/trading/new', $html);
+    }
 }

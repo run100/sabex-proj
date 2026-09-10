@@ -7,6 +7,7 @@ use App\Services\Trades\TradeListingService;
 use App\Support\TradeCanonical;
 use App\Support\TradePaths;
 use App\Support\TradeQueryRules;
+use App\Support\TradeSeo;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -27,6 +28,7 @@ class PendingController extends Controller
             'seoDescription' => 'Browse pending Steal a Brainrot trades waiting to be finished in Roblox on SABExistCount.',
             'canonical' => $seo['canonical'],
             'robots' => $seo['robots'],
+            'jsonLd' => TradeSeo::breadcrumbJsonLd('Pending Steal a Brainrot Trades', $seo['canonical']),
             'listings' => $page,
         ]));
     }

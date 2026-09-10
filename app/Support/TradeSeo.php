@@ -335,6 +335,43 @@ class TradeSeo
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '{}';
     }
 
+    public static function breadcrumbJsonLd(?string $currentName = null, ?string $currentUrl = null): string
+    {
+        $home = rtrim(SabHost::origin('www'), '/');
+        $items = [
+            [
+                '@type' => 'ListItem',
+                'position' => 1,
+                'name' => 'Home',
+                'item' => $home,
+            ],
+            [
+                '@type' => 'ListItem',
+                'position' => 2,
+                'name' => 'Trades',
+                'item' => $home.TradePaths::marketplace(),
+            ],
+        ];
+        $currentName = trim((string) $currentName);
+        $currentUrl = trim((string) $currentUrl);
+        if ($currentName !== '' && $currentUrl !== '') {
+            $items[] = [
+                '@type' => 'ListItem',
+                'position' => 3,
+                'name' => $currentName,
+                'item' => $currentUrl,
+            ];
+        }
+
+        $json = json_encode([
+            '@context' => 'https://schema.org',
+            '@type' => 'BreadcrumbList',
+            'itemListElement' => $items,
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '{}';
+
+        return '<script type="application/ld+json">'.$json.'</script>';
+    }
+
     /**
      * @param  array{label: string, tokens: list<string>, more: int}  $offer
      * @param  array{label: string, tokens: list<string>, more: int}  $look

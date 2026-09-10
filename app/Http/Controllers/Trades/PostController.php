@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\Seo\SabRenderService;
 use App\Support\TradeCanonical;
 use App\Support\TradePaths;
+use App\Support\TradeSeo;
 use Illuminate\View\View;
 
 class PostController extends Controller
@@ -22,7 +23,7 @@ class PostController extends Controller
             'seoDescription' => 'Post a Steal a Brainrot trade ad on SABExistCount. Add I Have and I Want items with mutations and traits, compare SAB values, income, exist counts, and W/F/L, then publish. Finish the swap in Roblox.',
             'seoKeywords' => 'Steal a Brainrot, trade ad, post trade, mutations, traits, SAB values, W/F/L',
             'maxItemsPerSide' => (int) config('sab-trades.max_items_per_side', 9),
-            'jsonLd' => null,
+            'jsonLd' => TradeSeo::breadcrumbJsonLd('Create Trade Ad', TradeCanonical::absolute(TradePaths::create())),
         ]));
 
         return view('trades.create', $context);

@@ -167,6 +167,9 @@ class HostRoutingTest extends TestCase
             ->assertSee('What is Steal a Brainrot trades?')
             ->assertSee('Is trading on SABExistCount free?')
             ->assertSee('FAQPage', false)
+            ->assertSee('BreadcrumbList', false)
+            ->assertSee('"name":"Trades"', false)
+            ->assertSee('/trading', false)
             ->assertDontSee('Open Post a Trade');
 
         $this->get('http://www.sabex.lab/robots.txt')

@@ -8,6 +8,7 @@ use App\Services\Trades\TradeActivityService;
 use App\Support\TradeCanonical;
 use App\Support\TradePaths;
 use App\Support\TradeProfileAccess;
+use App\Support\TradeSeo;
 use App\Support\TradeQueryRules;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -46,6 +47,7 @@ class ActivityController extends Controller
             'seoTitle' => 'SABExistCount - Steal a Brainrot Offers',
             'seoDescription' => 'Review received, sent, and expired Steal a Brainrot offers on SABExistCount.',
             'canonical' => TradeCanonical::absolute(TradePaths::offers()),
+            'jsonLd' => TradeSeo::breadcrumbJsonLd('Offers', TradeCanonical::absolute(TradePaths::offers())),
             'robots' => 'noindex,nofollow',
             'status' => $status,
             'tabCopy' => $tabCopy,

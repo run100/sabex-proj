@@ -9,6 +9,7 @@ use App\Services\Trades\TradeStatsService;
 use App\Support\TradeCanonical;
 use App\Support\TradeIndexEligibility;
 use App\Support\TradeProfileAccess;
+use App\Support\TradeSeo;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
@@ -51,6 +52,7 @@ class ProfileController extends Controller
             'seoTitle' => $name.' Steal a Brainrot Trades & Trade History | SABExistCount',
             'seoDescription' => 'View '.$name.'\'s Steal a Brainrot trading profile, active SAB trades and completed trade history on SABExistCount.',
             'canonical' => TradeCanonical::absolute($profile->profilePath()),
+            'jsonLd' => TradeSeo::breadcrumbJsonLd($name, TradeCanonical::absolute($profile->profilePath())),
             'robots' => $indexable ? 'index,follow' : 'noindex,follow',
             'profile' => $profile,
             'stats' => $stats->forUser($profile),

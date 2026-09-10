@@ -7,6 +7,7 @@ use App\Services\Trades\TradeListingService;
 use App\Support\TradeCanonical;
 use App\Support\TradePaths;
 use App\Support\TradeQueryRules;
+use App\Support\TradeSeo;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -27,6 +28,7 @@ class CompletedController extends Controller
             'seoDescription' => 'Verified Steal a Brainrot trades confirmed by both players on SABExistCount. Community reference only.',
             'canonical' => $seo['canonical'],
             'robots' => $seo['robots'],
+            'jsonLd' => TradeSeo::breadcrumbJsonLd('Completed Steal a Brainrot Trades', $seo['canonical']),
             'listings' => $page,
         ]));
     }

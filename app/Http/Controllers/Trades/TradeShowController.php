@@ -46,10 +46,13 @@ class TradeShowController extends Controller
         }
         $seo = TradeSeo::listing($listing);
 
+        $canonical = TradeCanonical::absolute(TradePaths::show($listing->public_id));
+
         return view('trades.show', $this->page([
             'seoTitle' => $seo['title'],
             'seoDescription' => $seo['description'],
-            'canonical' => TradeCanonical::absolute(TradePaths::show($listing->public_id)),
+            'canonical' => $canonical,
+            'jsonLd' => TradeSeo::breadcrumbJsonLd($seo['h1'], $canonical),
             'robots' => 'index,follow',
             'listing' => $listing,
             'listingH1' => $seo['h1'],
