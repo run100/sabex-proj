@@ -51,6 +51,7 @@ Artisan::command('seo:sab-calculator-refresh', function () {
             .' items='.$result['catalog_items']
             .' mutations='.$result['catalog_mutations']
             .' chunks='.$result['catalog_chunks']
+            .' value_rows='.$result['catalog_value_list_rows']
             .' bytes='.$result['catalog_bytes']);
         $this->line('Catalog manifest: '.$result['catalog_manifest_path']);
         Log::info('seo.sab-calculator-refresh', $result);
@@ -81,6 +82,7 @@ Artisan::command('seo:sab-calculator-catalog', function () {
             .' items='.$result['items']
             .' mutations='.$result['mutations']
             .' chunks='.$result['chunks']
+            .' value_rows='.$result['value_list_rows']
             .' bytes='.$result['bytes']);
         $this->line('Catalog manifest: '.$result['manifest_path']);
         Log::info('seo.sab-calculator-catalog', $result);

@@ -188,7 +188,7 @@ CREATE TABLE IF NOT EXISTS `seo_trade_join_requests` (
   KEY `idx_trade_join_listing_status` (`listing_id`, `status`, `created_at`),
   KEY `idx_trade_join_requester_status` (`requester_user_id`, `status`, `created_at`),
   KEY `idx_trade_join_owner_status` (`owner_user_id`, `status`),
-  KEY `idx_trade_join_pair` (`requester_user_id`, `owner_user_id`),
+  KEY `idx_trade_join_pair` (`requester_user_id`, `owner_user_id`, `listing_id`),
   CONSTRAINT `fk_trade_join_listing`
     FOREIGN KEY (`listing_id`) REFERENCES `seo_trade_listings` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_trade_join_requester`
@@ -246,7 +246,7 @@ CREATE TABLE IF NOT EXISTS `seo_trade_notifications` (
   PRIMARY KEY (`id`),
   KEY `idx_trade_notifications_user_read` (`user_id`, `is_read`, `created_at`),
   KEY `idx_trade_notifications_listing` (`listing_id`),
-  KEY `idx_trade_notifications_message_pair` (`actor_user_id`, `user_id`, `type`),
+  KEY `idx_trade_notifications_message_pair` (`actor_user_id`, `user_id`, `listing_id`, `type`),
   CONSTRAINT `fk_trade_notification_user`
     FOREIGN KEY (`user_id`) REFERENCES `seo_trade_users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_trade_notification_listing`

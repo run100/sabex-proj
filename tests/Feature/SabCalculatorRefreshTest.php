@@ -200,12 +200,23 @@ class SabCalculatorRefreshTest extends TestCase
         $manifest = json_decode((string) File::get(SabCalculatorCatalogService::manifestPath()), true);
         $this->assertSame(2, data_get($manifest, 'counts.items'));
         $this->assertSame(3, data_get($manifest, 'counts.mutations'));
+        $this->assertSame(2, data_get($manifest, 'counts.value_list_rows'));
         $this->assertNotEmpty($manifest['bootstrap'] ?? null);
+        $this->assertNotEmpty($manifest['value_list'] ?? null);
         $this->assertCount(1, $manifest['chunks'] ?? []);
         $bootstrapPath = SabCalculatorCatalogService::releaseBootstrapPath((string) ($manifest['version'] ?? ''));
         $this->assertFileExists($bootstrapPath);
         $bootstrap = json_decode((string) File::get($bootstrapPath), true);
         $this->assertCount(2, $bootstrap['items'] ?? []);
+        $valueListPath = SabCalculatorCatalogService::releasePath((string) ($manifest['version'] ?? '')).'/value-list.json';
+        $this->assertFileExists($valueListPath);
+        $valueList = json_decode((string) File::get($valueListPath), true);
+        $this->assertCount(2, $valueList['rows'] ?? []);
+
+        $valueListResponse = $this->get('http://www.sabex.lab/sab-value-list');
+        $valueListResponse->assertOk()
+            ->assertSee($manifest['value_list'], false)
+            ->assertSee('id="brainrot-list"', false);
 
         $manifestResponse = $this->get('http://www.sabex.lab/data/calc/sab/manifest.json');
         $manifestResponse->assertOk()
@@ -218,6 +229,11 @@ class SabCalculatorRefreshTest extends TestCase
             ->assertHeader('Content-Type', 'application/json; charset=UTF-8');
         $this->assertStringContainsString('max-age=31536000', (string) $bootstrapResponse->headers->get('Cache-Control'));
         $this->assertStringContainsString('immutable', (string) $bootstrapResponse->headers->get('Cache-Control'));
+
+        $valueListDataResponse = $this->get('http://www.sabex.lab'.$manifest['value_list']);
+        $valueListDataResponse->assertOk()
+            ->assertHeader('Content-Type', 'application/json; charset=UTF-8');
+        $this->assertStringContainsString('immutable', (string) $valueListDataResponse->headers->get('Cache-Control'));
 
         $firstSyncedAt = $meta['synced_at'];
         $this->travel(2)->seconds();
@@ -405,6 +421,7 @@ class SabCalculatorRefreshTest extends TestCase
             $table->unsignedBigInteger('seo_game_id')->nullable();
             $table->string('slug');
             $table->string('name')->nullable();
+            $table->string('display_name')->nullable();
             $table->string('rarity')->nullable();
             $table->text('description')->nullable();
             $table->text('summary')->nullable();

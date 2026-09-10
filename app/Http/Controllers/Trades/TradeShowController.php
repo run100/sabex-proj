@@ -39,7 +39,7 @@ class TradeShowController extends Controller
         $joinQuota = $user
             && $listing->isOpen()
             && (int) $user->id !== (int) $listing->owner_user_id
-            ? $joins->contactQuota($user, $listing->owner)
+            ? $joins->contactQuota($listing, $user, $listing->owner)
             : null;
         if ($user && (int) $user->id === (int) $listing->owner_user_id) {
             $joinRequests = $joins->forListing($user, $listing);

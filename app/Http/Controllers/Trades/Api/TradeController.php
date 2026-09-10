@@ -64,7 +64,7 @@ class TradeController extends Controller
                     auth('trades')->user(),
                     $offering,
                     $looking,
-                    null,
+                    $request->input('note'),
                     AccessLogService::ip($request)
                 );
 
@@ -143,8 +143,8 @@ class TradeController extends Controller
 
             return TradeApi::ok([
                 'items' => $items,
-                'message_quota' => $peer ? $notifications->messageQuota($user, $peer) : null,
-                'contact_quota' => $peer ? $notifications->contactQuota($user, $peer) : null,
+                'message_quota' => $peer ? $notifications->messageQuota($listing, $user, $peer) : null,
+                'contact_quota' => $peer ? $notifications->contactQuota($listing, $user, $peer) : null,
             ]);
         } catch (TradeException $e) {
             return TradeApi::fromException($e);

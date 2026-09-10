@@ -113,6 +113,8 @@
   const configPanels = Array.from(root.querySelectorAll('[data-config-panel]'));
   const searchBrainrot = root.querySelector('[data-search-brainrot]');
   const searchTrait = root.querySelector('[data-search-trait]');
+  const noteInput = root.querySelector('[data-trade-note]');
+  const noteCount = root.querySelector('[data-note-count]');
   const authModal = document.querySelector('[data-roblox-auth-modal]');
 
   function money(value) {
@@ -188,6 +190,14 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function containsTradeMarkup(value) {
+    return /<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?\s*\/?>|<!--[\s\S]*?(?:-->|$)|<![A-Za-z][^>]*>|<\?[A-Za-z][^>]*\?>|<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?$|&(?:[A-Za-z][A-Za-z0-9]+|#\d+|#x[0-9A-F]+);/i.test(value);
+  }
+
+  function isTradeNormalText(value) {
+    return /^[\p{L}\p{M}\p{N}\p{Zs}\r\n.,!?;:'\"()\-_\/，。！？；：、（）「」『』【】《》〈〉…—–·]+$/u.test(value);
   }
 
   function renderSideCards(side) {
@@ -412,6 +422,11 @@
     root.querySelectorAll('[data-publish-trade]').forEach((btn) => {
       btn.classList.toggle('is-ready', ready);
     });
+  }
+
+  function updateNoteCount() {
+    if (!noteInput || !noteCount) return;
+    noteCount.textContent = String(noteInput.value.length);
   }
 
   function render() {
@@ -779,6 +794,7 @@
       window.localStorage.setItem(draftKey, JSON.stringify({
         offer: serializeSide(state.offer),
         receive: serializeSide(state.receive),
+        note: noteInput ? noteInput.value : '',
       }));
     } catch (error) {
       // Ignore quota / private mode.
@@ -801,6 +817,9 @@
       const draft = JSON.parse(raw);
       state.offer = await hydrateItems(draft.offer);
       state.receive = await hydrateItems(draft.receive);
+      if (noteInput && typeof draft.note === 'string') {
+        noteInput.value = draft.note.slice(0, Number(noteInput.maxLength) || 280);
+      }
     } catch (error) {
       // Ignore bad drafts.
     }
@@ -858,6 +877,15 @@
       if (status) status.textContent = 'Add at least one item to each side before publishing.';
       return;
     }
+    const note = noteInput ? noteInput.value.trim() : '';
+    if (note && containsTradeMarkup(note)) {
+      if (status) status.textContent = 'HTML/XML tags are not allowed.';
+      return;
+    }
+    if (note && !isTradeNormalText(note)) {
+      if (status) status.textContent = 'Only normal text, numbers, spaces, line breaks, and common punctuation are allowed.';
+      return;
+    }
     const serialize = (items) => items.map((item) => {
       const calc = calcItem(item);
       const traits = (item.traits || []).filter((trait) => trait && trait.name);
@@ -886,6 +914,7 @@
         body: JSON.stringify({
           offering: serialize(state.offer),
           looking_for: serialize(state.receive),
+          note,
         }),
       });
       const payload = await response.json().catch(() => ({}));
@@ -913,6 +942,7 @@
     clearBtn.addEventListener('click', () => {
       state.offer = [];
       state.receive = [];
+      if (noteInput) noteInput.value = '';
       clearDraft();
       render();
     });
@@ -958,6 +988,10 @@
   searchBrainrot?.addEventListener('input', renderBrainrotGrid);
   searchTrait?.addEventListener('input', renderTraits);
   modal?.addEventListener('click', event => { if (event.target === modal) closeModal(); });
+  noteInput?.addEventListener('input', () => {
+    updateNoteCount();
+    persistDraft();
+  });
 
   if (authModal) {
     authModal.querySelectorAll('[data-auth-modal-close]').forEach((btn) => {
@@ -984,6 +1018,7 @@
 
   renderHelpSection();
   await restoreDraft();
+  updateNoteCount();
 
   const initialSlug = new URLSearchParams(window.location.search).get('item');
   if (initialSlug && !state.offer.length) {

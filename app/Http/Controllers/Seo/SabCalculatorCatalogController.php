@@ -22,6 +22,15 @@ class SabCalculatorCatalogController extends Controller
         );
     }
 
+    public function valueList(string $version): Response
+    {
+        return $this->fileResponse(
+            SabCalculatorCatalogService::releasePath($version).'/value-list.json',
+            31536000,
+            true,
+        );
+    }
+
     public function chunk(string $version, string $chunk): Response
     {
         abort_unless(preg_match('/^[0-9]{2}$/', $chunk) === 1, 404);

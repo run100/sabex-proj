@@ -26,6 +26,7 @@ class SabCalculatorCatalogService
      *     items: int,
      *     mutations: int,
      *     chunks: int,
+     *     value_list_rows: int,
      *     bytes: int
      * }
      */
@@ -56,6 +57,7 @@ class SabCalculatorCatalogService
 
         $chunks = [];
         $index = [];
+        $valueListSourceRows = [];
         $mutationCount = 0;
         $calculator = app(SabRenderService::class);
 
@@ -84,6 +86,49 @@ class SabCalculatorCatalogService
                 ->values();
             if ($orderedItems->isEmpty()) {
                 continue;
+            }
+
+            foreach ($orderedItems as $item) {
+                $rot = data_get($item->attributes_json, 'rot_rocks', []);
+                $baseVariant = $item->variants->firstWhere('variant_key', 'base')
+                    ?? $item->variants->firstWhere('variant_type', 'base');
+                $baseCurrentValue = $baseVariant?->currentValues->first(
+                    fn ($value): bool => $value->source?->slug === SabRotCalculatorSyncService::SOURCE_SLUG,
+                );
+                $hasSourceValue = $item->variants->contains(
+                    fn ($variant): bool => $variant->currentValues->contains(
+                        fn ($value): bool => $value->source?->slug === SabRotCalculatorSyncService::SOURCE_SLUG,
+                    ),
+                );
+                if ((bool) $item->is_listed && (data_get($item->attributes_json, 'rot_rocks') !== null || $hasSourceValue)) {
+                    $valueListSourceRows[] = [
+                        'slug' => (string) $item->slug,
+                        'name' => (string) $item->name,
+                        'summary' => (string) ($item->summary ?? ''),
+                        'rarity' => (string) ($item->rarity ?? ''),
+                        'is_publish_html' => (bool) ($item->is_publish_html ?? false),
+                        'image' => SabRenderService::listingImageSrc($item),
+                        'currentValue' => $baseCurrentValue?->value_normalized !== null
+                            ? (float) $baseCurrentValue->value_normalized
+                            : (is_numeric(data_get($rot, 'robux_value')) ? (float) data_get($rot, 'robux_value') : null),
+                        'currentDemand' => (string) ($baseCurrentValue?->demand ?? ''),
+                        'demand' => (string) data_get($rot, 'demand'),
+                        'trend' => (string) data_get($rot, 'trend'),
+                        'mutationLabels' => $item->variants
+                            ->filter(fn ($variant): bool => in_array((string) ($variant->variant_type ?? ''), ['base', 'mutation'], true))
+                            ->map(function ($variant): string {
+                                if ((string) ($variant->variant_type ?? '') === 'base') {
+                                    return 'Default';
+                                }
+
+                                return trim((string) ($variant->mutation_name ?: $variant->variant_name ?: ''));
+                            })
+                            ->filter()
+                            ->unique(fn (string $label): string => strtolower($label))
+                            ->values()
+                            ->all(),
+                    ];
+                }
             }
 
             $rows = $calculator->calculatorData($orderedItems, $site)['brainrots'] ?? [];
@@ -117,6 +162,7 @@ class SabCalculatorCatalogService
         $syncedAt ??= now()->toIso8601String();
         $meta = $this->readMeta();
         $chunkIds = array_keys($chunks);
+        $valueList = $this->buildValueListData($valueListSourceRows);
         $seed = json_encode([
             'schema_version' => self::SCHEMA_VERSION,
             'synced_at' => $syncedAt,
@@ -145,6 +191,13 @@ class SabCalculatorCatalogService
                 'brainrots' => $rows,
             ]);
         }
+        $encodedValueList = $this->encode([
+            'schema_version' => self::SCHEMA_VERSION,
+            'version' => $version,
+            'synced_at' => $syncedAt,
+            'rows' => $valueList['rows'],
+            'today' => $valueList['today'],
+        ]);
 
         $catalogRoot = self::catalogRootPath();
         $releasesRoot = $catalogRoot.'/releases';
@@ -158,6 +211,7 @@ class SabCalculatorCatalogService
             foreach ($encodedChunks as $chunkId => $encodedChunk) {
                 File::put($temporaryRoot.'/chunks/'.$chunkId.'.json', $encodedChunk);
             }
+            File::put($temporaryRoot.'/value-list.json', $encodedValueList);
 
             if (! @rename($temporaryRoot, $releaseRoot)) {
                 throw new \RuntimeException('Unable to publish calculator catalog release: '.$version);
@@ -173,10 +227,12 @@ class SabCalculatorCatalogService
                         $chunkId => self::PUBLIC_BASE_PATH.'/releases/'.$version.'/chunks/'.$chunkId.'.json',
                     ]
                 )->all(),
+                'value_list' => self::PUBLIC_BASE_PATH.'/releases/'.$version.'/value-list.json',
                 'counts' => [
                     'items' => count($index),
                     'mutations' => $mutationCount,
                     'chunks' => count($chunkIds),
+                    'value_list_rows' => count($valueList['rows']),
                 ],
             ];
             $manifestPath = self::manifestPath();
@@ -196,6 +252,7 @@ class SabCalculatorCatalogService
 
         $bytes = filesize($manifestPath) ?: 0;
         $bytes += filesize($releaseRoot.'/bootstrap.json') ?: 0;
+        $bytes += filesize($releaseRoot.'/value-list.json') ?: 0;
         foreach ($chunkIds as $chunkId) {
             $bytes += filesize($releaseRoot.'/chunks/'.$chunkId.'.json') ?: 0;
         }
@@ -206,8 +263,125 @@ class SabCalculatorCatalogService
             'items' => count($index),
             'mutations' => $mutationCount,
             'chunks' => count($chunkIds),
+            'value_list_rows' => count($valueList['rows']),
             'bytes' => $bytes,
         ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $sourceRows
+     * @return array{rows: list<array<string, mixed>>, today: array{gainer: ?array, loser: ?array}}
+     */
+    private function buildValueListData(array $sourceRows): array
+    {
+        $changesBySlug = collect(app(SabValueChangesService::class)
+            ->changes(7, null, 'recent', 1000))
+            ->keyBy(fn (array $change): string => (string) ($change['itemSlug'] ?? ''));
+        $rows = [];
+
+        foreach ($sourceRows as $sourceRow) {
+                $slug = (string) ($sourceRow['slug'] ?? '');
+                if ($slug === '') {
+                    continue;
+                }
+                $change = $changesBySlug->get($slug);
+                $currentValue = is_numeric($sourceRow['currentValue'] ?? null) ? (float) $sourceRow['currentValue'] : null;
+                $previousValue = is_numeric($change['beforeValue'] ?? null) ? (float) $change['beforeValue'] : null;
+                $delta = ($currentValue !== null && $previousValue !== null)
+                    ? round($currentValue - $previousValue, 4)
+                    : null;
+                $deltaPct = ($previousValue !== null && $previousValue != 0.0 && $delta !== null)
+                    ? round(($delta / $previousValue) * 100, 1)
+                    : null;
+                $direction = $delta === null ? 'stable' : ($delta > 0 ? 'up' : ($delta < 0 ? 'down' : 'stable'));
+                $demand = trim((string) (($sourceRow['demand'] ?? '')
+                    ?: ($sourceRow['currentDemand'] ?? '')
+                    ?: ($change['demandAfter'] ?? $change['demandBefore'] ?? '')));
+                $trend = trim((string) ($sourceRow['trend'] ?? ''));
+                $mutationLabels = array_values($sourceRow['mutationLabels'] ?? []);
+                $rarityKey = SabRenderService::canonicalRarityKey($sourceRow['rarity'] ?? '');
+                $rarityLabel = $rarityKey === ''
+                    ? ''
+                    : ($rarityKey === 'og' ? 'OG' : SabRenderService::canonicalRarityLabel($rarityKey));
+                $item = new SeoItem([
+                    'slug' => $slug,
+                    'is_publish_html' => (bool) ($sourceRow['is_publish_html'] ?? false),
+                ]);
+                $canOpenProduct = SabRenderService::shouldLinkProduct($item);
+                $name = (string) (($sourceRow['name'] ?? '') ?: $slug);
+                $search = implode(' ', array_filter([
+                    $name,
+                    $rarityKey,
+                    $rarityLabel,
+                    $sourceRow['summary'] ?? '',
+                    $currentValue !== null ? (string) (int) round($currentValue) : null,
+                    $currentValue !== null ? number_format($currentValue, 0, '', '') : null,
+                    $previousValue !== null ? (string) (int) round($previousValue) : null,
+                    $previousValue !== null ? number_format($previousValue, 0, '', '') : null,
+                    $direction,
+                    $demand,
+                    $trend,
+                    implode(' ', $mutationLabels),
+                ], fn ($value): bool => trim((string) $value) !== ''));
+
+                $rows[] = [
+                    'n' => $name,
+                    's' => SabRenderService::productPublicSlug($slug),
+                    'img' => (string) ($sourceRow['image'] ?? ''),
+                    'link' => $canOpenProduct ? 1 : 0,
+                    'cv' => $currentValue !== null ? number_format($currentValue) : '—',
+                    'cvn' => $currentValue,
+                    'pv' => $previousValue !== null ? number_format($previousValue) : '—',
+                    'd' => $direction,
+                    'dl' => match ($direction) {
+                        'up' => 'Up',
+                        'down' => 'Down',
+                        default => 'Stable',
+                    },
+                    'dp' => $deltaPct === null ? '—' : (($deltaPct > 0 ? '+' : '').$deltaPct.'%'),
+                    'dd' => $this->formatValueListDeltaLabel($delta),
+                    'dm' => $demand !== '' ? Str::title($demand) : '—',
+                    'tr' => $trend !== '' ? Str::title(strtolower(str_replace('_', ' ', $trend))) : '—',
+                    'rk' => $rarityKey,
+                    'r' => $rarityLabel,
+                    'mut' => $mutationLabels,
+                    'q' => strtolower($search),
+                ];
+        }
+
+        usort($rows, static function (array $left, array $right): int {
+            $leftValue = $left['cvn'] ?? null;
+            $rightValue = $right['cvn'] ?? null;
+            $leftHasValue = $leftValue !== null;
+            $rightHasValue = $rightValue !== null;
+            if ($leftHasValue !== $rightHasValue) {
+                return $leftHasValue ? -1 : 1;
+            }
+            if ($leftHasValue && $rightHasValue && (float) $leftValue !== (float) $rightValue) {
+                return (float) $rightValue <=> (float) $leftValue;
+            }
+
+            return strcasecmp((string) ($left['n'] ?? ''), (string) ($right['n'] ?? ''));
+        });
+
+        $valueChanges = app(SabValueChangesService::class);
+
+        return [
+            'rows' => $rows,
+            'today' => [
+                'gainer' => $valueChanges->topGainers(1, 1)[0] ?? null,
+                'loser' => $valueChanges->topLosers(1, 1)[0] ?? null,
+            ],
+        ];
+    }
+
+    private function formatValueListDeltaLabel(?float $delta): string
+    {
+        if ($delta === null || $delta == 0.0) {
+            return '—';
+        }
+
+        return ($delta > 0 ? '+' : '').rtrim(rtrim(number_format($delta, 2, '.', ''), '0'), '.');
     }
 
     public static function rootPath(): string
@@ -251,6 +425,55 @@ class SabCalculatorCatalogService
     public static function publicManifestUrl(): string
     {
         return self::PUBLIC_BASE_PATH.'/manifest.json';
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public static function readManifest(): ?array
+    {
+        $path = self::manifestPath();
+        if (! is_file($path)) {
+            return null;
+        }
+
+        $data = json_decode((string) File::get($path), true);
+
+        return is_array($data) ? $data : null;
+    }
+
+    public static function currentValueListPath(): ?string
+    {
+        $manifest = self::readManifest();
+        $version = trim((string) ($manifest['version'] ?? ''));
+        if ($version === '') {
+            return null;
+        }
+
+        $path = self::releasePath($version).'/value-list.json';
+
+        return is_file($path) ? $path : null;
+    }
+
+    /**
+     * @return array{rows: list<array<string, mixed>>, today: array<string, mixed>}|null
+     */
+    public static function readValueList(): ?array
+    {
+        $path = self::currentValueListPath();
+        if ($path === null) {
+            return null;
+        }
+
+        $data = json_decode((string) File::get($path), true);
+        if (! is_array($data) || ! is_array($data['rows'] ?? null)) {
+            return null;
+        }
+
+        return [
+            'rows' => array_values($data['rows']),
+            'today' => is_array($data['today'] ?? null) ? $data['today'] : [],
+        ];
     }
 
     public static function releaseBootstrapPath(string $version): string

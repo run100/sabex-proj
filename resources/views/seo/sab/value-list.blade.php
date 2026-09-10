@@ -605,35 +605,40 @@
   <div id="brainrot-list" class="sab-vl-grid" data-values-grid>
     @foreach($ssrRows as $row)
     @php
-      $item = $row['item'];
-      $canOpenProduct = (bool) ($row['canOpenProduct'] ?? false);
-      $productUrl = $row['productUrl'] ?? '#';
-      $direction = $row['direction'] ?? 'stable';
+      $name = (string) ($row['n'] ?? $row['name'] ?? data_get($row['item'] ?? null, 'name', ''));
+      $canOpenProduct = (bool) ($row['link'] ?? $row['canOpenProduct'] ?? false);
+      $productSlug = (string) ($row['s'] ?? '');
+      $productUrl = $productSlug !== ''
+        ? rtrim((string) ($productUrlPrefix ?? ''), '/') . '/products/' . $productSlug
+        : ($row['productUrl'] ?? '#');
+      $direction = $row['d'] ?? $row['direction'] ?? 'stable';
       $changeClass = match ($direction) {
         'up' => 'is-up',
         'down' => 'is-down',
         default => 'is-flat',
       };
-      $demandLabel = (string) ($row['demandLabel'] ?? '—');
-      $trendLabel = (string) ($row['trendLabel'] ?? '—');
-      $rarityKey = (string) ($row['rarityKey'] ?? '');
-      $rarityLabel = (string) ($row['rarityLabel'] ?? '');
-      $mutations = array_values($row['mutationLabels'] ?? []);
+      $demandLabel = (string) ($row['dm'] ?? $row['demandLabel'] ?? '—');
+      $trendLabel = (string) ($row['tr'] ?? $row['trendLabel'] ?? '—');
+      $rarityKey = (string) ($row['rk'] ?? $row['rarityKey'] ?? '');
+      $rarityLabel = (string) ($row['r'] ?? $row['rarityLabel'] ?? '');
+      $mutations = array_values($row['mut'] ?? $row['mutationLabels'] ?? []);
       $visibleMuts = array_slice($mutations, 0, 4);
       $extraMuts = max(0, count($mutations) - count($visibleMuts));
-      $currentValue = is_numeric($row['currentValue'] ?? null) ? (float) $row['currentValue'] : null;
+      $currentValue = is_numeric($row['cvn'] ?? ($row['currentValue'] ?? null))
+        ? (float) ($row['cvn'] ?? $row['currentValue'])
+        : null;
       $tag = $canOpenProduct ? 'a' : 'div';
       $hrefAttr = $canOpenProduct ? ' href="'.e($productUrl).'"' : '';
     @endphp
     <{{ $tag }} class="sab-vl-card"{{ $hrefAttr }}>
       <div class="sab-vl-card__head">
         <div class="sab-vl-card__thumb">
-          @if(!empty($row['imageSrc']))
-          <img src="{{ $row['imageSrc'] }}" alt="{{ $item->name }}" width="56" height="56" loading="lazy" />
+          @if(!empty($row['img'] ?? $row['imageSrc'] ?? null))
+          <img src="{{ $row['img'] ?? $row['imageSrc'] }}" alt="{{ $name }}" width="56" height="56" loading="lazy" />
           @endif
         </div>
         <div class="min-w-0 flex-1">
-          <h3 class="sab-vl-card__title">{{ $item->name }}</h3>
+          <h3 class="sab-vl-card__title">{{ $name }}</h3>
           <div class="sab-vl-card__badges">
             @if($rarityLabel !== '')
             <span class="sab-vl-badge {{ $rarityClass($rarityKey) }}">{{ $rarityLabel }}</span>
@@ -662,13 +667,13 @@
         </div>
       </div>
       <div class="sab-vl-meta">
-        <div class="sab-vl-meta__row"><span>Previous</span><strong>{{ $row['previousValueLabel'] ?? '—' }}</strong></div>
+        <div class="sab-vl-meta__row"><span>Previous</span><strong>{{ $row['pv'] ?? ($row['previousValueLabel'] ?? '—') }}</strong></div>
         <div class="sab-vl-meta__row">
           <span>Change</span>
           <strong class="sab-vl-delta {{ $changeClass }}">
-            {{ $row['directionLabel'] ?? 'Stable' }}
-            @if(($row['deltaPctLabel'] ?? '—') !== '—') {{ $row['deltaPctLabel'] }} @endif
-            @if(($row['deltaLabel'] ?? '—') !== '—') · {{ $row['deltaLabel'] }} @endif
+            {{ $row['dl'] ?? ($row['directionLabel'] ?? 'Stable') }}
+            @if(($row['dp'] ?? ($row['deltaPctLabel'] ?? '—')) !== '—') {{ $row['dp'] ?? $row['deltaPctLabel'] }} @endif
+            @if(($row['dd'] ?? ($row['deltaLabel'] ?? '—')) !== '—') · {{ $row['dd'] ?? $row['deltaLabel'] }} @endif
           </strong>
         </div>
         <div class="sab-vl-meta__row"><span>Trend</span><strong>{{ $trendLabel }}</strong></div>
@@ -715,15 +720,16 @@
 <script>
   (() => {
     const PER_PAGE = {{ (int) $listPerPage }};
-    const PRODUCT_PREFIX = {!! json_encode($productUrlPrefix ?? '') !!};
-    const ALL_ROWS = {!! json_encode($listRows ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!};
+    const PRODUCT_PREFIX = {!! json_encode($productUrlPrefix ?? '', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!};
+    let ALL_ROWS = {!! json_encode($listRows ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!};
+    const DATA_URL = {!! json_encode($valueListDataUrl ?? '', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!};
     const input = document.getElementById('brainrot-search');
     const sortSelect = document.getElementById('brainrot-sort');
     const grid = document.getElementById('brainrot-list');
     const count = document.getElementById('brainrot-search-count');
     const empty = document.getElementById('brainrot-search-empty');
     const loadMoreBtn = document.getElementById('brainrot-load-more');
-    const total = ALL_ROWS.length;
+    let total = ALL_ROWS.length;
     const normalize = v => String(v || '').toLowerCase().replace(/\s+/g, ' ').trim();
     const esc = s => String(s ?? '')
       .replace(/&/g, '&amp;')
@@ -904,6 +910,23 @@
     });
 
     update({ resetVisible: true });
+
+    const loadAllRows = async () => {
+      if (!DATA_URL) return;
+      try {
+        const response = await fetch(DATA_URL, { credentials: 'same-origin' });
+        if (!response.ok) throw new Error(`Value list request failed: ${response.status}`);
+        const payload = await response.json();
+        if (!Array.isArray(payload.rows)) throw new Error('Value list payload is invalid.');
+        ALL_ROWS = payload.rows;
+        total = ALL_ROWS.length;
+        update({ resetVisible: true });
+      } catch (error) {
+        console.error('SAB value list data failed', error);
+      }
+    };
+
+    loadAllRows();
   })();
 </script>
 @endsection

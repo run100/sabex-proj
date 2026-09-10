@@ -20,6 +20,8 @@ Route::get('/products/{slug}/price-history.json', [SabPublicController::class, '
 Route::get('/data/calc/sab/manifest.json', [SabCalculatorCatalogController::class, 'manifest']);
 Route::get('/data/calc/sab/releases/{version}/bootstrap.json', [SabCalculatorCatalogController::class, 'bootstrap'])
     ->where('version', '[a-z0-9][a-z0-9-]*');
+Route::get('/data/calc/sab/releases/{version}/value-list.json', [SabCalculatorCatalogController::class, 'valueList'])
+    ->where('version', '[a-z0-9][a-z0-9-]*');
 Route::get('/data/calc/sab/releases/{version}/chunks/{chunk}.json', [SabCalculatorCatalogController::class, 'chunk'])
     ->where([
         'version' => '[a-z0-9][a-z0-9-]*',

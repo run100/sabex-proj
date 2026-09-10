@@ -28,6 +28,7 @@
   $messageUrl = '/api/v1/trading/trades/'.$listing->public_id.'/messages';
   $messagePeer = $messagePeer ?? null;
   $joinQuota = $joinQuota ?? null;
+  $contactLimit = (int) config('sab-trades.contact_limit_per_user', 5);
   $canMessage = $user && $messagePeer && (int) $messagePeer->id !== (int) $user->id;
   $peerName = $messagePeer?->display_name ?: $messagePeer?->username ?: 'Trader';
   $peerAvatar = (string) ($messagePeer?->avatar_url ?? '');
@@ -431,7 +432,7 @@
 </section>
 
 @if($canMessage)
-<div class="trades-msg" hidden data-message-modal data-messages-url="{{ $messageUrl }}" data-peer-name="{{ $peerName }}" data-peer-avatar="{{ $peerAvatar }}">
+<div class="trades-msg" hidden data-message-modal data-contact-limit="{{ $contactLimit }}" data-messages-url="{{ $messageUrl }}" data-peer-name="{{ $peerName }}" data-peer-avatar="{{ $peerAvatar }}">
   <div class="trades-msg__dialog" role="dialog" aria-modal="true" aria-labelledby="trades-msg-name">
     <header class="trades-msg__head">
       <div class="trades-msg__peer">
@@ -564,6 +565,7 @@
     const input = modal.querySelector('[data-message-input]');
     const error = modal.querySelector('[data-message-error]');
     const url = modal.getAttribute('data-messages-url');
+    const contactLimit = Number(modal.getAttribute('data-contact-limit') || 5);
     let messageQuota = null;
 
     function setOpen(open) {
@@ -589,7 +591,7 @@
         button.disabled = Boolean(exhausted);
       });
       if (exhausted) {
-        error.textContent = 'You can send at most 2 messages or trade requests to this user.';
+        error.textContent = `You can send at most ${contactLimit} messages or trade requests to this user.`;
       }
     }
 
@@ -637,7 +639,7 @@
       const payload = await response.json().catch(() => ({}));
       if (!payload.success) {
         if (payload.error?.code === 'MESSAGE_LIMIT_REACHED') {
-          updateMessageQuota({ limit: 2, sent: 2, remaining: 0 });
+          updateMessageQuota({ limit: contactLimit, sent: contactLimit, remaining: 0 });
         }
         error.textContent = payload.error?.message || 'Could not send.';
         return;
@@ -678,7 +680,7 @@
     const error = modal.querySelector('[data-offer-error]');
     const noteInput = form?.querySelector('[name="note"]');
     const submitButton = form?.querySelector('button[type="submit"]');
-    const contactLimit = Number(modal.getAttribute('data-contact-limit') || 2);
+    const contactLimit = Number(modal.getAttribute('data-contact-limit') || 5);
     const rawRemaining = modal.getAttribute('data-contact-remaining');
     let contactQuota = rawRemaining === null || rawRemaining === ''
       ? null
@@ -694,7 +696,7 @@
       if (noteInput) noteInput.disabled = Boolean(exhausted);
       if (submitButton) submitButton.disabled = Boolean(exhausted);
       if (exhausted && error) {
-        error.textContent = 'You can send at most 2 messages or trade requests to this user.';
+        error.textContent = `You can send at most ${contactLimit} messages or trade requests to this user.`;
       }
     }
 

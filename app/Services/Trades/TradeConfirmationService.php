@@ -6,6 +6,7 @@ use App\Exceptions\TradeException;
 use App\Models\TradeConfirmation;
 use App\Models\TradeListing;
 use App\Models\TradeUser;
+use App\Support\TradeTextPolicy;
 use Illuminate\Support\Facades\DB;
 
 class TradeConfirmationService
@@ -15,11 +16,12 @@ class TradeConfirmationService
         private readonly TradeNotificationService $notifications,
     ) {}
 
-    public function confirm(TradeUser $user, TradeListing $listing, string $confirmation, ?string $note = null): TradeListing
+    public function confirm(TradeUser $user, TradeListing $listing, string $confirmation, mixed $note = null): TradeListing
     {
         if (! $user->isActive()) {
             throw TradeException::banned();
         }
+        $note = TradeTextPolicy::optional($note);
         if (! in_array($confirmation, [TradeConfirmation::COMPLETED, TradeConfirmation::FAILED], true)) {
             throw TradeException::invalid('ONLY_PARTICIPANT_CAN_CONFIRM', 'Confirmation must be completed or failed.');
         }

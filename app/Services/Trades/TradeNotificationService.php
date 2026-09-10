@@ -84,7 +84,7 @@ class TradeNotificationService
 
             $this->quota->lockPair($actor, $recipient);
 
-            $quota = $this->contactQuota($actor, $recipient);
+            $quota = $this->contactQuota($lockedListing, $actor, $recipient);
             if ($quota['remaining'] < 1) {
                 throw TradeException::conflict(
                     'MESSAGE_LIMIT_REACHED',
@@ -99,17 +99,17 @@ class TradeNotificationService
     /**
      * @return array{limit: int, sent: int, remaining: int}
      */
-    public function messageQuota(TradeUser $actor, TradeUser $recipient): array
+    public function messageQuota(TradeListing $listing, TradeUser $actor, TradeUser $recipient): array
     {
-        return $this->quota->messageQuota($actor, $recipient);
+        return $this->quota->messageQuota($listing, $actor, $recipient);
     }
 
     /**
      * @return array{limit: int, sent: int, remaining: int}
      */
-    public function contactQuota(TradeUser $actor, TradeUser $recipient): array
+    public function contactQuota(TradeListing $listing, TradeUser $actor, TradeUser $recipient): array
     {
-        return $this->quota->contactQuota($actor, $recipient);
+        return $this->quota->contactQuota($listing, $actor, $recipient);
     }
 
     public function peer(TradeUser $actor, TradeListing $listing): ?TradeUser

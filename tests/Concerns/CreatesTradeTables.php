@@ -151,7 +151,7 @@ trait CreatesTradeTables
             $table->timestamp('rejected_at')->nullable();
             $table->timestamp('cancelled_at')->nullable();
             $table->timestamp('expires_at')->nullable();
-            $table->index(['requester_user_id', 'owner_user_id'], 'idx_trade_join_pair');
+            $table->index(['requester_user_id', 'owner_user_id', 'listing_id'], 'idx_trade_join_pair');
         });
         Schema::create('seo_trade_confirmations', function (Blueprint $table): void {
             $table->id();
@@ -182,7 +182,7 @@ trait CreatesTradeTables
             $table->boolean('is_read')->default(false);
             $table->timestamp('read_at')->nullable();
             $table->timestamp('created_at')->nullable();
-            $table->index(['actor_user_id', 'user_id', 'type'], 'idx_trade_notifications_message_pair');
+            $table->index(['actor_user_id', 'user_id', 'listing_id', 'type'], 'idx_trade_notifications_message_pair');
         });
         Schema::create('seo_trade_reports', function (Blueprint $table): void {
             $table->id();

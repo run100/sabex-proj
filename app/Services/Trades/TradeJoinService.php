@@ -57,7 +57,7 @@ class TradeJoinService
                 throw TradeException::conflict('JOIN_ALREADY_EXISTS', 'You already requested to join this trade.');
             }
 
-            $quota = $this->quota->contactQuota($user, $owner);
+            $quota = $this->quota->contactQuota($lockedListing, $user, $owner);
             if ($quota['remaining'] < 1) {
                 throw TradeException::conflict(
                     'JOIN_LIMIT_REACHED',
@@ -99,9 +99,9 @@ class TradeJoinService
     /**
      * @return array{limit: int, sent: int, remaining: int}
      */
-    public function contactQuota(TradeUser $user, TradeUser $owner): array
+    public function contactQuota(TradeListing $listing, TradeUser $user, TradeUser $owner): array
     {
-        return $this->quota->contactQuota($user, $owner);
+        return $this->quota->contactQuota($listing, $user, $owner);
     }
 
     public function cancel(TradeUser $user, TradeJoinRequest $request): TradeJoinRequest

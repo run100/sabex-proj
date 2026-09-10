@@ -1644,10 +1644,24 @@ class SabRenderService
             ->firstOrFail();
 
         $baseUrl = rtrim($site->base_url ?: 'https://sabexistcount.com', '/');
-        $items = $this->loadItems($game);
         $i18n = $this->loadI18n($site);
         $t = $this->mergeSabTranslations($locale, $i18n);
         $urlPrefix = self::localizedPreviewPath($locale);
+
+        $catalogData = SabCalculatorCatalogService::readValueList();
+        if ($catalogData !== null) {
+            return $this->valueListViewPayload(
+                $urlPrefix,
+                $locale,
+                $baseUrl,
+                $t,
+                collect(),
+                self::CSS_HREF_LARAVEL,
+                $catalogData,
+            );
+        }
+
+        $items = $this->loadItems($game);
 
         return $this->valueListViewPayload($urlPrefix, $locale, $baseUrl, $t, $items, self::CSS_HREF_LARAVEL);
     }
@@ -4672,11 +4686,31 @@ class SabRenderService
     /**
      * @return array<string, mixed>
      */
-    private function valueListViewPayload(string $urlPrefix, string $locale, string $baseUrl, array $t, Collection $allItems, string $cssHref): array
+    private function valueListViewPayload(
+        string $urlPrefix,
+        string $locale,
+        string $baseUrl,
+        array $t,
+        Collection $allItems,
+        string $cssHref,
+        ?array $catalogData = null,
+    ): array
     {
-        $filtered = $this->sortValueListItemsByRobux(
-            $this->filterItemsWithRotRocks(self::listedItems($allItems))
-        );
+        $filtered = collect();
+        $valueListRows = [];
+        $listRows = [];
+        $ssrValueListRows = [];
+        if ($catalogData !== null) {
+            $listRows = array_values($catalogData['rows'] ?? []);
+            $ssrValueListRows = array_slice($listRows, 0, self::VALUE_LIST_PER_PAGE);
+        } else {
+            $filtered = $this->sortValueListItemsByRobux(
+                $this->filterItemsWithRotRocks(self::listedItems($allItems))
+            );
+            $valueListRows = $this->buildValueListRows($filtered, $urlPrefix);
+            $listRows = $this->buildValueListCompactRows($valueListRows);
+            $ssrValueListRows = array_slice($listRows, 0, self::VALUE_LIST_PER_PAGE);
+        }
 
         $monthLabel = $this->localizedMonthLabel(Carbon::now(), $locale);
         $replacePairs = ['{month}' => $monthLabel];
@@ -4687,14 +4721,24 @@ class SabRenderService
 
         $pageUrl = $this->localePublicUrl($baseUrl, $locale, self::PAGE_VALUE_LIST);
         $faqItems = $this->buildValueListFaqItems($t, $urlPrefix, $baseUrl, $locale);
-        $valueListRows = $this->buildValueListRows($filtered, $urlPrefix);
-        $listRows = $this->buildValueListCompactRows($valueListRows);
         $lastUpdate = $this->calculatorLastUpdatePayload($locale);
         $calculatorMessages = $this->calculatorCopy($locale);
         $productUrlPrefix = $this->productUrlPrefix($urlPrefix);
-        $valueChanges = app(SabValueChangesService::class);
-        $todayTopGainer = $this->enrichValueChangeRows($valueChanges->topGainers(1, 1), $urlPrefix)[0] ?? null;
-        $todayTopLoser = $this->enrichValueChangeRows($valueChanges->topLosers(1, 1), $urlPrefix)[0] ?? null;
+        if ($catalogData !== null) {
+            $today = is_array($catalogData['today'] ?? null) ? $catalogData['today'] : [];
+            $todayTopGainer = $this->enrichValueChangeRows(
+                is_array($today['gainer'] ?? null) ? [$today['gainer']] : [],
+                $urlPrefix,
+            )[0] ?? null;
+            $todayTopLoser = $this->enrichValueChangeRows(
+                is_array($today['loser'] ?? null) ? [$today['loser']] : [],
+                $urlPrefix,
+            )[0] ?? null;
+        } else {
+            $valueChanges = app(SabValueChangesService::class);
+            $todayTopGainer = $this->enrichValueChangeRows($valueChanges->topGainers(1, 1), $urlPrefix)[0] ?? null;
+            $todayTopLoser = $this->enrichValueChangeRows($valueChanges->topLosers(1, 1), $urlPrefix)[0] ?? null;
+        }
 
         return [
             'locale'         => $locale,
@@ -4709,10 +4753,11 @@ class SabRenderService
             'seoDescription' => $seoDescription,
             'items'          => $filtered,
             'valueListRows'  => $valueListRows,
-            'ssrValueListRows' => array_slice($valueListRows, 0, self::VALUE_LIST_PER_PAGE),
-            'listRows'       => $listRows,
+            'ssrValueListRows' => $ssrValueListRows,
+            'listRows'       => $ssrValueListRows,
             'listPerPage'    => self::VALUE_LIST_PER_PAGE,
-            'listStatTotal'  => $filtered->count(),
+            'listStatTotal'  => $catalogData !== null ? count($listRows) : $filtered->count(),
+            'valueListDataUrl' => data_get(SabCalculatorCatalogService::readManifest() ?? [], 'value_list'),
             'valueListFaqItems' => $faqItems,
             'lastUpdateLabel' => (string) ($calculatorMessages['last_update_label'] ?? 'Last update'),
             'valueTrendsLabel' => (string) ($calculatorMessages['value_trends_label'] ?? 'View Daily Value Trends'),

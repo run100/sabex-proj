@@ -48,11 +48,12 @@ class TradesBoardTest extends TestCase
                 'note' => 'Looking for a fair swap',
             ])
             ->assertCreated()
-            ->assertJsonPath('success', true);
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.trade.note', 'Looking for a fair swap');
 
         $listing = TradeListing::query()->first();
         $this->assertNotNull($listing);
-        $this->assertNull($listing->note);
+        $this->assertSame('Looking for a fair swap', $listing->note);
         $this->assertSame(0, (int) $listing->sort_order);
         $this->assertSame(TradeListing::FLAG_NO, $listing->is_hot);
         $this->assertSame(TradeListing::FLAG_NO, $listing->is_top);
@@ -343,8 +344,8 @@ class TradesBoardTest extends TestCase
             ->assertSee('data-message-open', false)
             ->assertSee('data-offer-open', false)
             ->assertSee('data-offer-form', false)
-            ->assertSee('data-contact-limit="2"', false)
-            ->assertSee('data-contact-remaining="2"', false)
+            ->assertSee('data-contact-limit="5"', false)
+            ->assertSee('data-contact-remaining="5"', false)
             ->assertSee('Send an offer')
             ->assertSee('You give')
             ->assertSee('You get')
@@ -536,12 +537,12 @@ class TradesBoardTest extends TestCase
         $this->actingAs($buyer, 'trades')
             ->getJson($url)
             ->assertOk()
-            ->assertJsonPath('data.message_quota.limit', 2)
+            ->assertJsonPath('data.message_quota.limit', 5)
             ->assertJsonPath('data.message_quota.sent', 1)
-            ->assertJsonPath('data.message_quota.remaining', 1)
-            ->assertJsonPath('data.contact_quota.limit', 2)
+            ->assertJsonPath('data.message_quota.remaining', 4)
+            ->assertJsonPath('data.contact_quota.limit', 5)
             ->assertJsonPath('data.contact_quota.sent', 1)
-            ->assertJsonPath('data.contact_quota.remaining', 1)
+            ->assertJsonPath('data.contact_quota.remaining', 4)
             ->assertJsonPath('data.items.0.message', "I'm ready to trade!")
             ->assertJsonPath('data.items.0.mine', true);
 
@@ -575,7 +576,7 @@ class TradesBoardTest extends TestCase
         $this->assertSame(1, TradeNotification::query()->where('user_id', $buyer->id)->where('type', 'trade_message')->count());
     }
 
-    public function test_trade_messages_reject_markup_and_enforce_global_directional_limit(): void
+    public function test_trade_messages_reject_markup_and_enforce_per_listing_directional_limit(): void
     {
         $owner = $this->tradeUser('55506', 'MessageOwner');
         $buyer = $this->tradeUser('55507', 'MessageBuyer');
@@ -590,7 +591,7 @@ class TradesBoardTest extends TestCase
         }
         $this->assertSame(0, TradeNotification::query()->where('listing_id', $listing->id)->where('type', 'trade_message')->count());
 
-        foreach (['First message', 'Second message'] as $message) {
+        foreach (['First message', 'Second message', 'Third message', 'Fourth message', 'Fifth message'] as $message) {
             $this->actingAs($buyer, 'trades')
                 ->postJson($url, ['message' => $message])
                 ->assertCreated();
@@ -599,12 +600,12 @@ class TradesBoardTest extends TestCase
         $this->actingAs($buyer, 'trades')
             ->getJson($url)
             ->assertOk()
-            ->assertJsonPath('data.message_quota.limit', 2)
-            ->assertJsonPath('data.message_quota.sent', 2)
+            ->assertJsonPath('data.message_quota.limit', 5)
+            ->assertJsonPath('data.message_quota.sent', 5)
             ->assertJsonPath('data.message_quota.remaining', 0);
 
         $this->actingAs($buyer, 'trades')
-            ->postJson($url, ['message' => 'Third message'])
+            ->postJson($url, ['message' => 'Sixth message'])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'MESSAGE_LIMIT_REACHED');
 
@@ -612,30 +613,37 @@ class TradesBoardTest extends TestCase
         $otherUrl = 'http://www.sabex.lab/api/v1/trading/trades/'.$otherListing->public_id.'/messages';
         $this->actingAs($buyer, 'trades')
             ->postJson($otherUrl, ['message' => 'Another trade'])
-            ->assertStatus(409)
-            ->assertJsonPath('error.code', 'MESSAGE_LIMIT_REACHED');
+            ->assertCreated();
 
-        $this->assertSame(2, TradeNotification::query()
+        $this->actingAs($buyer, 'trades')
+            ->getJson($otherUrl)
+            ->assertOk()
+            ->assertJsonPath('data.contact_quota.limit', 5)
+            ->assertJsonPath('data.contact_quota.sent', 1)
+            ->assertJsonPath('data.contact_quota.remaining', 4);
+
+        $this->assertSame(6, TradeNotification::query()
             ->where('type', TradeNotificationService::TYPE_MESSAGE)
             ->where('actor_user_id', $buyer->id)
             ->where('user_id', $owner->id)
             ->count());
 
-        foreach (['Reply one', 'Reply two'] as $message) {
+        foreach (['Reply one', 'Reply two', 'Reply three', 'Reply four', 'Reply five'] as $message) {
             $this->actingAs($owner, 'trades')
                 ->postJson($url, ['message' => $message])
                 ->assertCreated();
         }
 
         $this->actingAs($owner, 'trades')
-            ->postJson($url, ['message' => 'Reply three'])
+            ->postJson($url, ['message' => 'Reply six'])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'MESSAGE_LIMIT_REACHED');
 
-        $this->assertSame(2, TradeNotification::query()
+        $this->assertSame(5, TradeNotification::query()
             ->where('type', TradeNotificationService::TYPE_MESSAGE)
             ->where('actor_user_id', $owner->id)
             ->where('user_id', $buyer->id)
+            ->where('listing_id', $listing->id)
             ->count());
     }
 
@@ -671,7 +679,7 @@ class TradesBoardTest extends TestCase
         $this->actingAs($buyer, 'trades')
             ->get('http://www.sabex.lab/trading/'.$listing->public_id)
             ->assertOk()
-            ->assertSee('data-contact-remaining="1"', false);
+            ->assertSee('data-contact-remaining="4"', false);
 
         $messageUrl = 'http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/messages';
         $this->actingAs($buyer, 'trades')
@@ -682,21 +690,34 @@ class TradesBoardTest extends TestCase
             ->postJson($messageUrl, ['message' => 'Reply'])
             ->assertCreated();
 
+        foreach (['Third interaction', 'Fourth interaction', 'Fifth interaction'] as $message) {
+            $this->actingAs($buyer, 'trades')
+                ->postJson($messageUrl, ['message' => $message])
+                ->assertCreated();
+        }
+
         $this->actingAs($buyer, 'trades')
             ->getJson($messageUrl)
             ->assertOk()
-            ->assertJsonPath('data.message_quota.sent', 1)
-            ->assertJsonPath('data.contact_quota.sent', 2)
+            ->assertJsonPath('data.message_quota.limit', 5)
+            ->assertJsonPath('data.message_quota.sent', 4)
+            ->assertJsonPath('data.message_quota.remaining', 1)
+            ->assertJsonPath('data.contact_quota.sent', 5)
             ->assertJsonPath('data.contact_quota.remaining', 0);
 
         $otherJoinUrl = 'http://www.sabex.lab/api/v1/trading/trades/'.$otherListing->public_id.'/join';
         $this->actingAs($buyer, 'trades')
             ->postJson($otherJoinUrl, ['note' => 'Another request'])
-            ->assertStatus(409)
-            ->assertJsonPath('error.code', 'JOIN_LIMIT_REACHED');
+            ->assertCreated();
 
         $this->actingAs($buyer, 'trades')
-            ->postJson($messageUrl, ['message' => 'Third interaction'])
+            ->getJson('http://www.sabex.lab/api/v1/trading/trades/'.$otherListing->public_id.'/messages')
+            ->assertOk()
+            ->assertJsonPath('data.contact_quota.sent', 1)
+            ->assertJsonPath('data.contact_quota.remaining', 4);
+
+        $this->actingAs($buyer, 'trades')
+            ->postJson($messageUrl, ['message' => 'Sixth interaction'])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'MESSAGE_LIMIT_REACHED');
 
@@ -704,10 +725,11 @@ class TradesBoardTest extends TestCase
             ->where('requester_user_id', $buyer->id)
             ->where('owner_user_id', $owner->id)
             ->count());
-        $this->assertSame(1, TradeNotification::query()
+        $this->assertSame(4, TradeNotification::query()
             ->where('actor_user_id', $buyer->id)
             ->where('user_id', $owner->id)
             ->where('type', TradeNotificationService::TYPE_MESSAGE)
+            ->where('listing_id', $listing->id)
             ->count());
     }
 

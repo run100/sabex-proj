@@ -217,7 +217,7 @@ php83 scripts/export-sab-to-mysql.php
 | `storage/app/seo/sab-i18n.json` | 站点文案翻译 |
 | `storage/app/seo/sab-exist-count-gallery.json` | gallery |
 | `storage/app/calc/sab/meta.json` | 计算器 meta |
-| `storage/app/calc/sab/catalog/` | 计算器 Catalog manifest、完整索引与分片 |
+| `storage/app/calc/sab/catalog/` | 计算器 Catalog、value-list manifest、完整索引与分片 |
 | `storage/app/seo/sab-price-history/{slug}.json` | 现 561 个文件（新商品可能还没有；商品页读不到也不 500） |
 | `resources/seo/sab/rebirths.json` | Wiki rebirth 指南 |
 

@@ -76,6 +76,7 @@ class SabRotCalculatorSyncService
      *     catalog_items: int,
      *     catalog_mutations: int,
      *     catalog_chunks: int,
+     *     catalog_value_list_rows: int,
      *     catalog_bytes: int
      * }
      */
@@ -262,6 +263,7 @@ class SabRotCalculatorSyncService
         $counts['catalog_items'] = $catalog['items'];
         $counts['catalog_mutations'] = $catalog['mutations'];
         $counts['catalog_chunks'] = $catalog['chunks'];
+        $counts['catalog_value_list_rows'] = $catalog['value_list_rows'];
         $counts['catalog_bytes'] = $catalog['bytes'];
 
         return $counts;

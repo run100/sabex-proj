@@ -12,6 +12,7 @@ use App\Models\TradeUser;
 use App\Support\AccessLogService;
 use App\Support\TradeProfileAccess;
 use App\Support\TradeSchema;
+use App\Support\TradeTextPolicy;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -32,16 +33,17 @@ class TradeListingService
     /**
      * @param  array<int, mixed>  $offering
      * @param  array<int, mixed>  $lookingFor
-     * @param  string|null  $note  Kept for compatibility while listing notes are disabled.
+     * @param  mixed  $note  Optional public listing note.
      */
-    public function create(TradeUser $user, array $offering, array $lookingFor, ?string $note = null, ?string $ip = null): TradeListing
+    public function create(TradeUser $user, array $offering, array $lookingFor, mixed $note = null, ?string $ip = null): TradeListing
     {
         $this->assertActive($user);
         $this->assertCanPost($user);
+        $note = TradeTextPolicy::optional($note);
 
         $snapshot = $this->valuation->snapshot($offering, $lookingFor);
 
-        return DB::transaction(function () use ($user, $snapshot, $ip): TradeListing {
+        return DB::transaction(function () use ($user, $snapshot, $note, $ip): TradeListing {
             TradeUser::query()->where('id', $user->id)->lockForUpdate()->first();
             $this->assertPostLimits($user);
 
@@ -53,6 +55,7 @@ class TradeListingService
                 'looking_value_snapshot' => $snapshot['looking_total'],
                 'value_difference_snapshot' => $snapshot['difference'],
                 'difference_percent_snapshot' => $snapshot['difference_percent'],
+                'note' => $note,
                 'expires_at' => now()->addHours((int) config('sab-trades.trade_expire_hours', 72)),
                 ...AccessLogService::attrs('seo_trade_listings', [
                     'posted_ip' => $ip,
