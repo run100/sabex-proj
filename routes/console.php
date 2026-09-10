@@ -5,6 +5,7 @@ use App\Services\Seo\SabCalculatorCatalogService;
 use App\Services\Seo\SabExistCountCatalogService;
 use App\Services\Seo\SabRenderService;
 use App\Services\Seo\SabRotCalculatorSyncService;
+use App\Services\Seo\SabWikiCatalogService;
 use App\Models\SeoSite;
 use App\Services\Trades\TradeListingService;
 use App\Support\TradeSchema;
@@ -125,6 +126,35 @@ Artisan::command('seo:sab-exist-count-refresh', function () {
 
     return 0;
 })->purpose('Generate the local SAB exist-count data without fetching rot.rocks');
+
+Artisan::command('seo:sab-wiki-catalog', function () {
+    try {
+        $site = SeoSite::query()
+            ->where('slug', SabRenderService::SITE_SLUG)
+            ->firstOrFail();
+        $game = $site->games()
+            ->where('slug', App\Services\Seo\SabSiteContext::GAME_SLUG)
+            ->firstOrFail();
+        $result = app(SabWikiCatalogService::class)->publish(
+            $game,
+            fn (string $message) => $this->line($message),
+        );
+
+        $this->info('SAB Wiki catalog completed.');
+        $this->line('Rows: '.$result['rows']);
+        $this->line('Generated at: '.$result['generated_at']);
+        $this->line('Bytes: '.$result['bytes']);
+        $this->line('Path: '.$result['path']);
+        Log::info('seo.sab-wiki-catalog', $result);
+    } catch (\Throwable $e) {
+        Log::error('seo.sab-wiki-catalog', ['error' => $e->getMessage()]);
+        $this->error($e->getMessage());
+
+        return 1;
+    }
+
+    return 0;
+})->purpose('Generate the local SAB Wiki catalog without fetching external sources');
 
 Artisan::command('seo:sab-price-history-backfill {--slug=* : Item slug to backfill; omit to process all eligible items} {--all : Same as omitting --slug (kept for compatibility)} {--sleep-ms=150 : Milliseconds to wait after each price-history API request} {--limit=0 : Process only the first N slugs (0 = no limit)}', function () {
     $service = app(SabRotCalculatorSyncService::class);

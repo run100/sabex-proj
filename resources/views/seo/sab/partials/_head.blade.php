@@ -65,11 +65,37 @@
 
 {{-- Microsoft Clarity --}}
 <script type="text/javascript">
-    (function(c,l,a,r,i,t,y){
-        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-    })(window, document, "clarity", "script", "wopc01npsc");
+    (function () {
+        function loadClarity() {
+            if (window.__sabClarityLoaded) return;
+            window.__sabClarityLoaded = true;
+            var c = window;
+            var l = document;
+            var a = 'clarity';
+            var r = 'script';
+            var i = 'wopc01npsc';
+            c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
+            var t = l.createElement(r);
+            t.async = 1;
+            t.src = 'https://www.clarity.ms/tag/' + i;
+            var y = l.getElementsByTagName(r)[0];
+            y.parentNode.insertBefore(t, y);
+        }
+
+        function scheduleClarity() {
+            if ('requestIdleCallback' in window) {
+                window.requestIdleCallback(loadClarity, { timeout: 3000 });
+            } else {
+                window.setTimeout(loadClarity, 2000);
+            }
+        }
+
+        if (document.readyState === 'complete') {
+            scheduleClarity();
+        } else {
+            window.addEventListener('load', scheduleClarity, { once: true });
+        }
+    })();
 </script>
 
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4457622474147266"

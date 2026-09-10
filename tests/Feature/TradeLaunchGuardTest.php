@@ -55,7 +55,8 @@ class TradeLaunchGuardTest extends TestCase
         $guestMe = $this->getJson('http://www.sabex.lab/api/v1/me')
             ->assertOk()
             ->assertJsonPath('data.user', null)
-            ->assertJsonPath('data.unread_count', 0);
+            ->assertJsonPath('data.unread_count', 0)
+            ->assertJsonPath('data.open_listings_count', 0);
         $this->assertStringContainsString('no-store', (string) $guestMe->headers->get('Cache-Control'));
 
         $this->actingAs($user, 'trades')
@@ -63,6 +64,7 @@ class TradeLaunchGuardTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.user.username', 'owner')
             ->assertJsonPath('data.user.can_post', true)
+            ->assertJsonPath('data.open_listings_count', 0)
             ->assertJsonMissingPath('data.user.email')
             ->assertJsonMissingPath('data.user.providers')
             ->assertJsonMissingPath('data.user.roblox_sub');

@@ -735,28 +735,7 @@
   <h2 class="sr-only">{{ $t['table_h2'] }}</h2>
 
   @if(($locale ?? 'en') === 'en')
-  @php
-    $adminAbuseHref = rtrim((string) ($urlPrefix ?? ''), '/') . '/' . \App\Services\Seo\SabWikiPageDefinitions::PAGE_WIKI_ADMIN_ABUSE;
-  @endphp
-  <div class="sab-news-home-notice mt-3 mb-1 inline-flex max-w-full items-center gap-2 text-left text-xs font-semibold leading-5 text-cyan-200" data-sab-news-home-notice>
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="h-4 w-4 shrink-0 text-cyan-300">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M4 14h3l7 4V6L7 10H4v4Z"/>
-      <path stroke-linecap="round" stroke-linejoin="round" d="M17 9a3 3 0 0 1 0 6M20 7a6 6 0 0 1 0 10"/>
-    </svg>
-    <a href="{{ $adminAbuseHref }}" class="font-semibold underline hover:text-cyan-100" data-sab-news-home-notice-link>New · Steal a Brainrot Admin Abuse Time Today</a>
-  </div>
-  <script>
-    (function () {
-      var link = document.querySelector('[data-sab-news-home-notice-link]');
-      if (link) {
-        link.addEventListener('click', function () {
-          if (typeof gtag === 'function') {
-            gtag('event', 'wiki_notice_click', { wiki_slug: 'admin-abuse' });
-          }
-        });
-      }
-    })();
-  </script>
+  @include('seo.sab.partials._trades-launch-notice', ['noticeClass' => 'sab-news-home-notice mt-3 mb-1'])
   @endif
 
   <div class="mb-3 mt-1">

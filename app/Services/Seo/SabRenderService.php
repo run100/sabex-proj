@@ -1748,15 +1748,25 @@ class SabRenderService
         $baseUrl = rtrim($site->base_url ?: 'https://sabexistcount.com', '/');
         $i18n = $this->loadI18n($site);
 
+        $storedCatalog = SabWikiCatalogService::read();
+        $items = $storedCatalog !== null ? collect() : $this->loadItems($game);
+        if ($storedCatalog === null) {
+            Log::warning('SAB Wiki catalog unavailable; falling back to database render.', [
+                'path' => SabWikiCatalogService::path(),
+                'hint' => 'Run php83 artisan seo:sab-wiki-catalog.',
+            ]);
+        }
+
         return $this->wikiPagePayload(
             $pageSlug,
             self::publicUrlPrefix(),
             $baseUrl,
             $this->mergeSabTranslations(self::DEFAULT_LOCALE, $i18n),
-            $this->loadItems($game),
+            $items,
             self::CSS_HREF_LARAVEL,
             $this->loadPublishedNews($site),
             $game,
+            $storedCatalog,
         );
     }
 
@@ -1772,8 +1782,11 @@ class SabRenderService
         string $cssHref,
         ?Collection $news = null,
         ?SeoGame $game = null,
+        ?array $storedCatalog = null,
     ): array {
-        $catalog = $this->buildWikiCatalog($urlPrefix, $items, $news);
+        $catalog = $storedCatalog !== null
+            ? $this->wikiCatalogFromStored($urlPrefix, $storedCatalog, $news)
+            : $this->buildWikiCatalog($urlPrefix, $items, $news);
         $pageSlug = $pageSlug === '' ? self::PAGE_WIKI : $pageSlug;
         $rarityKey = SabWikiPageDefinitions::rarityKeyForPage($pageSlug);
         $topicKey = SabWikiPageDefinitions::topicKeyForPage($pageSlug);
@@ -2163,6 +2176,156 @@ class SabRenderService
     }
 
     /**
+     * @return array{rows: list<array<string, mixed>>, summary: array<string, mixed>}
+     */
+    public function wikiCatalogForStorage(Collection $items): array
+    {
+        $catalog = $this->buildWikiCatalog('', $items);
+        $rows = array_map(fn (array $row): array => $this->serializeWikiCatalogRow($row), $catalog['rows']);
+        $newest = collect($rows)
+            ->filter(fn (array $row): bool => (bool) ($row['isNew'] ?? false))
+            ->sortByDesc(fn (array $row): int => $this->parseWikiCatalogDate($row['addedAt'] ?? null)?->timestamp ?? 0)
+            ->take(12)
+            ->values()
+            ->all();
+        $knownRarest = $catalog['knownRarest'] !== null
+            ? $this->serializeWikiCatalogRow($catalog['knownRarest'])
+            : null;
+
+        return [
+            'rows' => $rows,
+            'summary' => [
+                'total' => count($rows),
+                'updated_at' => $catalog['updatedAt']?->toIso8601String(),
+                'known_rarest' => $knownRarest,
+                'newest' => $newest,
+                'rarity_counts' => collect($catalog['groups'])
+                    ->mapWithKeys(fn (array $group): array => [(string) $group['key'] => (int) $group['count']])
+                    ->all(),
+                'topic_counts' => collect($catalog['topics'])
+                    ->mapWithKeys(fn (array $topic): array => [(string) $topic['key'] => (int) $topic['count']])
+                    ->all(),
+            ],
+        ];
+    }
+
+    /**
+     * @return array{rows: list<array<string, mixed>>, groups: list<array<string, mixed>>, topics: list<array<string, mixed>>, newest: list<array<string, mixed>>, news: list<array<string, mixed>>, total: int, updatedAt: ?Carbon, knownRarest: ?array<string, mixed>}
+     */
+    private function wikiCatalogFromStored(string $urlPrefix, array $storedCatalog, ?Collection $news = null): array
+    {
+        $rows = collect($storedCatalog['rows'] ?? [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->map(function (array $row) use ($urlPrefix): array {
+                $row['updatedAt'] = $this->parseWikiCatalogDate($row['updatedAt'] ?? null);
+                $row['addedAt'] = $this->parseWikiCatalogDate($row['addedAt'] ?? null);
+                $row['productUrl'] = rtrim($this->productUrlPrefix($urlPrefix), '/')
+                    .'/products/'.self::productPublicSlug((string) ($row['slug'] ?? ''));
+
+                return $row;
+            })
+            ->values();
+
+        return $this->assembleWikiCatalog($rows, $urlPrefix, $news);
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function serializeWikiCatalogRow(array $row): array
+    {
+        unset($row['productUrl']);
+        foreach (['updatedAt', 'addedAt'] as $key) {
+            if (($row[$key] ?? null) instanceof Carbon) {
+                $row[$key] = $row[$key]->toIso8601String();
+            } elseif ($row[$key] ?? null) {
+                $row[$key] = $this->parseWikiCatalogDate($row[$key])?->toIso8601String();
+            } else {
+                $row[$key] = null;
+            }
+        }
+
+        return $row;
+    }
+
+    private function parseWikiCatalogDate(mixed $value): ?Carbon
+    {
+        if ($value instanceof Carbon) {
+            return $value->copy();
+        }
+        if ($value === null || trim((string) $value) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse((string) $value);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return array{rows: list<array<string, mixed>>, groups: list<array<string, mixed>>, topics: list<array<string, mixed>>, newest: list<array<string, mixed>>, news: list<array<string, mixed>>, total: int, updatedAt: ?Carbon, knownRarest: ?array<string, mixed>}
+     */
+    private function assembleWikiCatalog(Collection $rows, string $urlPrefix, ?Collection $news = null): array
+    {
+        $groups = $this->wikiGroupsForRows($rows, null);
+        $latest = $rows->pluck('updatedAt')->filter()->sortDesc()->first();
+        $knownRarest = $rows
+            ->filter(fn (array $row): bool => ($row['existCountKind'] ?? '') === 'known' && $row['existCount'] !== null)
+            ->sortBy('existCount')
+            ->first();
+        $updatedAt = $latest instanceof Carbon ? $latest : null;
+        $newest = $rows
+            ->filter(fn (array $row): bool => (bool) ($row['isNew'] ?? false))
+            ->sortByDesc(fn (array $row): int => $row['addedAt'] instanceof Carbon ? $row['addedAt']->timestamp : 0)
+            ->take(12)
+            ->values()
+            ->all();
+        $topics = collect(self::wikiTopicDefinitions())
+            ->map(function (array $topic) use ($rows): array {
+                $topicRows = $rows
+                    ->filter(fn (array $row): bool => in_array($topic['key'], $row['topicKeys'] ?? [], true))
+                    ->values()
+                    ->all();
+
+                return [
+                    ...$topic,
+                    'rows' => $topicRows,
+                    'count' => count($topicRows),
+                ];
+            })
+            ->all();
+        $newsItems = collect($news ?? [])
+            ->filter(fn ($article): bool => $article instanceof SeoNewsArticle
+                && $article->locale === self::DEFAULT_LOCALE
+                && $article->status === 'published')
+            ->take(6)
+            ->map(fn (SeoNewsArticle $article): array => [
+                'title' => (string) $article->title,
+                'href' => rtrim($urlPrefix, '/').'/news/'.$article->slug,
+                'dateLabel' => $article->published_at
+                    ? $article->published_at->copy()->setTimezone('America/Los_Angeles')->locale('en')->isoFormat('MMM D, YYYY')
+                    : null,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'rows' => $rows->all(),
+            'groups' => $groups,
+            'topics' => $topics,
+            'newest' => $newest,
+            'news' => $newsItems,
+            'total' => $rows->count(),
+            'updatedAt' => $updatedAt,
+            'knownRarest' => $knownRarest,
+        ];
+    }
+
+    /**
      * @return array{rows: list<array<string, mixed>>, groups: list<array<string, mixed>>, topics: list<array<string, mixed>>, newest: list<array<string, mixed>>, news: list<array<string, mixed>>, total: int, updatedAt: ?Carbon, knownRarest: ?array<string, mixed>}
      */
     private function buildWikiCatalog(string $urlPrefix, Collection $items, ?Collection $news = null): array
@@ -2272,58 +2435,7 @@ class SabRenderService
             ->sortBy(fn (array $row): string => strtolower($row['name']))
             ->values();
 
-        $groups = $this->wikiGroupsForRows($rows, null);
-        $latest = $rows->pluck('updatedAt')->filter()->sortDesc()->first();
-        $knownRarest = $rows
-            ->filter(fn (array $row): bool => ($row['existCountKind'] ?? '') === 'known' && $row['existCount'] !== null)
-            ->sortBy('existCount')
-            ->first();
-        $updatedAt = $latest instanceof Carbon ? $latest : null;
-        $newest = $rows
-            ->filter(fn (array $row): bool => (bool) ($row['isNew'] ?? false))
-            ->sortByDesc(fn (array $row): int => $row['addedAt'] instanceof Carbon ? $row['addedAt']->timestamp : 0)
-            ->take(12)
-            ->values()
-            ->all();
-        $topics = collect(self::wikiTopicDefinitions())
-            ->map(function (array $topic) use ($rows): array {
-                $topicRows = $rows
-                    ->filter(fn (array $row): bool => in_array($topic['key'], $row['topicKeys'] ?? [], true))
-                    ->values()
-                    ->all();
-
-                return [
-                    ...$topic,
-                    'rows' => $topicRows,
-                    'count' => count($topicRows),
-                ];
-            })
-            ->all();
-        $newsItems = collect($news ?? [])
-            ->filter(fn ($article): bool => $article instanceof SeoNewsArticle
-                && $article->locale === self::DEFAULT_LOCALE
-                && $article->status === 'published')
-            ->take(6)
-            ->map(fn (SeoNewsArticle $article): array => [
-                'title' => (string) $article->title,
-                'href' => rtrim($urlPrefix, '/').'/news/'.$article->slug,
-                'dateLabel' => $article->published_at
-                    ? $article->published_at->copy()->setTimezone('America/Los_Angeles')->locale('en')->isoFormat('MMM D, YYYY')
-                    : null,
-            ])
-            ->values()
-            ->all();
-
-        return [
-            'rows' => $rows->all(),
-            'groups' => $groups,
-            'topics' => $topics,
-            'newest' => $newest,
-            'news' => $newsItems,
-            'total' => $rows->count(),
-            'updatedAt' => $updatedAt,
-            'knownRarest' => $knownRarest,
-        ];
+        return $this->assembleWikiCatalog($rows, $urlPrefix, $news);
     }
 
     /**

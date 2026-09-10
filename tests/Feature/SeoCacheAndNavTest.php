@@ -106,6 +106,32 @@ class SeoCacheAndNavTest extends TestCase
             ->assertSee('sab-calc-trade-pills', false);
     }
 
+    public function test_home_value_list_and_calculator_promote_live_trade_ads(): void
+    {
+        foreach (['/', '/sab-value-list', '/steal-a-brainrot-trading-calculator'] as $path) {
+            $this->get('http://www.sabex.lab'.$path)
+                ->assertOk()
+                ->assertSee('New · Trade ads are live — browse open Steal a Brainrot trades')
+                ->assertSee('href="'.\App\Support\TradePaths::marketplace().'"', false)
+                ->assertSee('data-sab-trades-launch-notice', false)
+                ->assertDontSee('New · Steal a Brainrot Admin Abuse Time Today');
+        }
+
+        $calculator = $this->get('http://www.sabex.lab/steal-a-brainrot-trading-calculator');
+        $calculator->assertOk()
+            ->assertDontSee('News · Aug 19')
+            ->assertDontSee('Headless Horseman rebounds');
+        $this->assertSame(1, substr_count($calculator->getContent(), 'New · Trade ads are live — browse open Steal a Brainrot trades'));
+
+        $promo = view('seo.sab.partials._promo-calculator')->render();
+        $this->assertStringContainsString('Open Trades', $promo);
+        $this->assertStringContainsString('New: Trade ads are live — post what you have or browse open trades', $promo);
+        $this->assertStringContainsString('href="'.\App\Support\TradePaths::marketplace().'"', $promo);
+        $this->assertStringContainsString('sab_trades_promo_closed', $promo);
+        $this->assertStringNotContainsString('SABExistCount Calculator', $promo);
+        $this->assertStringNotContainsString('sab_calc_promo_closed', $promo);
+    }
+
     public function test_logged_in_seo_html_stays_anonymous(): void
     {
         $user = TradeUser::query()->create([
@@ -205,6 +231,24 @@ class SeoCacheAndNavTest extends TestCase
         $this->assertStringContainsString("var ME_URL = '/api/v1/me'", $navJs);
         $this->assertStringNotContainsString('hideTradesNavExtras', $navJs);
         $this->assertSame(1, preg_match('/function renderHeader[\s\S]+function renderDrawer/', $navJs, $headerFn));
+        $this->assertStringContainsString('function quickLinks(openCount)', $navJs);
+        $this->assertStringContainsString('function tradesBadge(openCount)', $navJs);
+        $this->assertStringContainsString('open_listings_count', $navJs);
+        $this->assertStringContainsString('Trades, ', $navJs);
+        $this->assertStringContainsString("icon('calculator')", $navJs);
+        $this->assertStringContainsString("icon('trades')", $navJs);
+        $this->assertStringContainsString('<path d="M8 3 4 7l4 4"/>', $navJs);
+        $this->assertStringContainsString('sab-nav-auth__quick-link--calculator', $navJs);
+        $this->assertStringContainsString('/steal-a-brainrot-trading-calculator', $navJs);
+        $this->assertStringContainsString('href="/trading"', $navJs);
+        $this->assertStringContainsString('title="Browse and post Steal a Brainrot trade ads"', $navJs);
+        $this->assertStringContainsString('function isTradesPath(path)', $navJs);
+        $this->assertStringContainsString("path === '/trading'", $navJs);
+        $this->assertStringContainsString("path.indexOf('/trading/') === 0", $navJs);
+        $this->assertStringContainsString('steal-a-brainrot-trading-calculator', $navJs);
+        $this->assertStringContainsString(' is-active', $navJs);
+        $this->assertStringContainsString('aria-current="page', $navJs);
+        $this->assertLessThan(strpos($navJs, 'href="/steal-a-brainrot-trading-calculator"'), strpos($navJs, 'href="/trading"'));
         $this->assertStringContainsString("icon('bell')", $headerFn[0]);
         $this->assertStringContainsString('aria-label="Alerts"', $headerFn[0]);
         $this->assertStringContainsString('data-sab-account-nav', $headerFn[0]);
@@ -214,6 +258,10 @@ class SeoCacheAndNavTest extends TestCase
         $this->assertStringNotContainsString('Last seen', $headerFn[0]);
         $headerView = (string) file_get_contents(resource_path('views/seo/sab/partials/_header.blade.php'));
         $this->assertStringContainsString('.sab-account-nav__menu', $headerView);
+        $this->assertStringContainsString('.sab-nav-auth__quick-link', $headerView);
+        $this->assertStringContainsString('.sab-nav-auth__quick-link--calculator svg', $headerView);
+        $this->assertStringContainsString('.sab-nav-auth__link.is-active', $headerView);
+        $this->assertStringContainsString('color: #67e8f9;', $headerView);
         $this->assertStringContainsString('#fb7185', $headerView);
         $this->assertSame(1, preg_match('/function renderDrawer[\s\S]+function renderBar/', $navJs, $drawerFn));
         $this->assertStringNotContainsString("'Account'", $drawerFn[0]);
@@ -247,7 +295,8 @@ class SeoCacheAndNavTest extends TestCase
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.user', null)
-            ->assertJsonPath('data.unread_count', 0);
+            ->assertJsonPath('data.unread_count', 0)
+            ->assertJsonPath('data.open_listings_count', 0);
         $this->assertPrivateNoStore($me);
     }
 

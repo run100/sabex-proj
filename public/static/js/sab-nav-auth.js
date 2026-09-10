@@ -6,12 +6,14 @@
   function icon(name) {
     var paths = {
       bell: '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 7 3 7H3s3 0 3-7"/><path d="M10 18a2 2 0 0 0 4 0"/>',
+      calculator: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/>',
+      trades: '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
       user: '<circle cx="12" cy="8" r="3"/><path d="M5 19a7 7 0 0 1 14 0"/>',
       settings: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M3 12h2M19 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
       logout: '<path d="M9 21H5V3h4"/><path d="M16 17 21 12 16 7"/><path d="M21 12H9"/>',
       login: '<path d="M15 3h4v18h-4"/><path d="M10 17 15 12 10 7"/><path d="M15 12H3"/>'
     };
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' + (paths[name] || '') + '</svg>';
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (paths[name] || '') + '</svg>';
   }
 
   function drawerLink(href, name, label, extra) {
@@ -77,10 +79,46 @@
 
   window.openSabAuthModal = openAuthModal;
 
-  function renderHeader(root, user, unread) {
+  function tradesBadge(openCount) {
+    var count = Number(openCount) || 0;
+    if (count <= 0) return '';
+    return '<span class="sab-nav-auth__badge">' + (count > 99 ? '99+' : count) + '</span>';
+  }
+
+  function tradesLabel(openCount) {
+    var count = Number(openCount) || 0;
+    return count > 0 ? 'Trades, ' + count + ' open' : 'Trades';
+  }
+
+  function currentPath() {
+    return (window.location.pathname || '/').replace(/\/+$/, '') || '/';
+  }
+
+  function isTradesPath(path) {
+    return path === '/trading' || path.indexOf('/trading/') === 0;
+  }
+
+  function isCalcPath(path) {
+    return path.indexOf('steal-a-brainrot-trading-calculator') !== -1;
+  }
+
+  function currentMark(active) {
+    return active ? ' is-active" aria-current="page' : '';
+  }
+
+  function quickLinks(openCount) {
+    var path = currentPath();
+    var tradesActive = isTradesPath(path);
+    var calcActive = isCalcPath(path);
+    return '<a href="/trading" class="sab-nav-auth__link sab-nav-auth__quick-link' + currentMark(tradesActive) + '" aria-label="' + tradesLabel(openCount) + '" title="Browse and post Steal a Brainrot trade ads">' + icon('trades') + tradesBadge(openCount) + '</a>' +
+      '<a href="/steal-a-brainrot-trading-calculator" class="sab-nav-auth__link sab-nav-auth__quick-link sab-nav-auth__quick-link--calculator' + currentMark(calcActive) + '" aria-label="Calculator" title="Calculator">' + icon('calculator') + '</a>';
+  }
+
+  function renderHeader(root, user, unread, openCount) {
     if (!root) return;
     if (!user) {
-      root.innerHTML = '<a href="' + escapeHtml(loginHref(root)) + '" class="sab-nav-auth__signin" data-nav-sign-in>Login</a>';
+      root.innerHTML = quickLinks(openCount) +
+        '<a href="' + escapeHtml(loginHref(root)) + '" class="sab-nav-auth__signin" data-nav-sign-in>Login</a>';
       return;
     }
     var name = escapeHtml(displayName(user));
@@ -88,7 +126,8 @@
     var profile = user.profile_path || '/user';
     var badge = unread > 0 ? '<span class="sab-nav-auth__badge">' + unread + '</span>' : '';
     root.innerHTML =
-      '<a href="/notifications" class="sab-nav-auth__link" aria-label="Alerts">' + icon('bell') + badge + '</a>' +
+      quickLinks(openCount) +
+      '<a href="/notifications" class="sab-nav-auth__link" aria-label="Alerts" title="Alerts">' + icon('bell') + badge + '</a>' +
       '<details class="sab-account-nav" data-sab-account-nav>' +
         '<summary class="sab-nav-auth__chip" aria-label="' + name + '">' +
           '<img class="sab-nav-auth__avatar" src="' + avatar + '" alt="" width="28" height="28">' +
@@ -158,8 +197,9 @@
   function applyMe(payload) {
     var user = payload && payload.user ? payload.user : null;
     var unread = payload && payload.unread_count ? Number(payload.unread_count) : 0;
-    window.__sabMe = { user: user, unread_count: unread };
-    renderHeader(document.querySelector('[data-nav-auth]'), user, unread);
+    var openCount = payload && payload.open_listings_count ? Number(payload.open_listings_count) : 0;
+    window.__sabMe = { user: user, unread_count: unread, open_listings_count: openCount };
+    renderHeader(document.querySelector('[data-nav-auth]'), user, unread, openCount);
     renderDrawer(document.querySelector('[data-nav-auth-drawer]'), user, unread);
     renderBar(document.querySelector('[data-nav-auth-bar]'), user, unread);
     window.dispatchEvent(new CustomEvent('sab-nav-auth', { detail: window.__sabMe }));
@@ -187,5 +227,5 @@
   fetch(ME_URL, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
     .then(function (response) { return response.json(); })
     .then(function (body) { applyMe(body && body.data ? body.data : {}); })
-    .catch(function () { applyMe({ user: null, unread_count: 0 }); });
+    .catch(function () { applyMe({ user: null, unread_count: 0, open_listings_count: 0 }); });
 })();

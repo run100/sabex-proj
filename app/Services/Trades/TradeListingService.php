@@ -178,6 +178,11 @@ class TradeListingService
             ->paginate($this->limit((int) ($filters['limit'] ?? 20)), ['*'], 'page', (int) ($filters['page'] ?? 1));
     }
 
+    public function publicOpenCount(): int
+    {
+        return $this->basePublicQuery([TradeListing::STATUS_OPEN])->count();
+    }
+
     /**
      * @param  array<string, mixed>  $filters
      */
@@ -333,18 +338,8 @@ class TradeListingService
      */
     private function filteredQuery(array $filters, array $statuses, bool $requireCounterparty = false): Builder
     {
-        $query = TradeListing::query()
-            ->with(['owner', 'counterparty', 'items.traits'])
-            ->whereIn('status', $statuses)
-            ->whereHas('owner', fn (Builder $q) => TradeProfileAccess::constrainPublicIdentity($q));
-        if ($requireCounterparty) {
-            $query->whereHas('counterparty', fn (Builder $q) => TradeProfileAccess::constrainPublicIdentity($q));
-        } else {
-            $query->where(function (Builder $outer): void {
-                $outer->whereNull('counterparty_user_id')
-                    ->orWhereHas('counterparty', fn (Builder $q) => TradeProfileAccess::constrainPublicIdentity($q));
-            });
-        }
+        $query = $this->basePublicQuery($statuses, $requireCounterparty)
+            ->with(['owner', 'counterparty', 'items.traits']);
 
         if (! empty($filters['want_brainrot_id'])) {
             $id = (int) $filters['want_brainrot_id'];
@@ -372,6 +367,26 @@ class TradeListingService
             'value_asc' => $query->orderBy('looking_value_snapshot')->orderByDesc('id'),
             default => $query->orderByDesc('created_at')->orderByDesc('id'),
         };
+    }
+
+    /**
+     * @param  list<string>  $statuses
+     */
+    private function basePublicQuery(array $statuses, bool $requireCounterparty = false): Builder
+    {
+        $query = TradeListing::query()
+            ->whereIn('status', $statuses)
+            ->whereHas('owner', fn (Builder $q) => TradeProfileAccess::constrainPublicIdentity($q));
+        if ($requireCounterparty) {
+            $query->whereHas('counterparty', fn (Builder $q) => TradeProfileAccess::constrainPublicIdentity($q));
+        } else {
+            $query->where(function (Builder $outer): void {
+                $outer->whereNull('counterparty_user_id')
+                    ->orWhereHas('counterparty', fn (Builder $q) => TradeProfileAccess::constrainPublicIdentity($q));
+            });
+        }
+
+        return $query;
     }
 
     private function applyPinSort(Builder $query): Builder

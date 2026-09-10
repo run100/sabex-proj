@@ -219,6 +219,7 @@ php83 scripts/export-sab-to-mysql.php
 | `storage/app/calc/sab/meta.json` | 计算器 meta |
 | `storage/app/calc/sab/catalog/` | 计算器 Catalog、value-list manifest、完整索引与 mutation 分片 |
 | `storage/app/seo/sab-exist-count-list.json` | 独立 Exist Count 首页与列表数据 |
+| `storage/app/seo/sab-wiki-catalog.json` | 独立 Wiki rows、topic、rarity、Newest 与更新时间数据 |
 | `storage/app/seo/sab-price-history/{slug}.json` | 现 561 个文件（新商品可能还没有；商品页读不到也不 500） |
 | `resources/seo/sab/rebirths.json` | Wiki rebirth 指南 |
 
@@ -252,6 +253,14 @@ php83 artisan seo:sab-exist-count-refresh
 ```
 
 这个命令只读取本站 MySQL 和本地数据，不访问 rot.rocks，原子写入 `storage/app/seo/sab-exist-count-list.json`。页面通过 `/data/seo/sab-exist-count-list.json` 读取它。`seo:sab-calculator-refresh` 不会更新这份低频 Exist Count 数据。
+
+如果只需要根据本站已有数据库重新生成 Wiki Catalog：
+
+```bash
+php83 artisan seo:sab-wiki-catalog
+```
+
+这个命令只读取本站 Items、Variants、Current Values 和本地新闻相关数据，原子写入 `storage/app/seo/sab-wiki-catalog.json`。页面通过 `/data/seo/sab-wiki-catalog.json` 读取它；Admin Abuse 时间表仍由 `seo_games.settings_json.sab_wiki.admin_abuse` 提供。
 
 ### 3. 再把 GEOFlow 最新业务数据同步过来（已按 upsert 做）
 

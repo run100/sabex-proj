@@ -233,6 +233,17 @@
   .sab-nav-auth__out:hover {
     color: #a5f3fc;
   }
+  .sab-nav-auth__link.is-active {
+    color: #67e8f9;
+  }
+  .sab-nav-auth__quick-link {
+    display: none;
+    flex-shrink: 0;
+  }
+  .sab-nav-auth__quick-link--calculator svg {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
   .sab-nav-auth__chip {
     display: inline-flex;
     align-items: center;
@@ -508,6 +519,29 @@
     }
     .sab-header-end {
       margin-left: 0;
+    }
+  }
+  @media (max-width: 767px) {
+    .sab-nav-auth {
+      gap: .3rem;
+    }
+    .sab-nav-auth__quick-link {
+      display: inline-flex;
+    }
+  }
+  @media (max-width: 479px) {
+    .sab-site-header__bar {
+      gap: 0;
+    }
+    .sab-nav-auth {
+      gap: .2rem;
+    }
+    .sab-nav-auth__signin {
+      padding-right: .7rem;
+      padding-left: .7rem;
+    }
+    label.sab-language-switch--mobile {
+      display: none;
     }
   }
   .sab-language-switch {

@@ -12,9 +12,12 @@ use App\Models\SeoSite;
 use App\Models\SeoValueSource;
 use App\Services\Seo\SabRenderService;
 use App\Services\Seo\SabRotCalculatorSyncService;
+use App\Services\Seo\SabWikiCatalogService;
 use App\Services\Seo\SabWikiPageDefinitions;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Tests\Concerns\CreatesSabWikiTables;
 use Tests\TestCase;
 
@@ -26,6 +29,92 @@ class SabWikiPageTest extends TestCase
     {
         parent::setUp();
         $this->createSeoTables();
+        File::delete(SabWikiCatalogService::path());
+    }
+
+    protected function tearDown(): void
+    {
+        File::delete(SabWikiCatalogService::path());
+        parent::tearDown();
+    }
+
+    public function test_wiki_catalog_command_writes_snapshot_and_pages_reuse_it(): void
+    {
+        $game = $this->seedGame();
+        $settingsBefore = $game->fresh()->settings_json;
+        $source = $this->seedSource();
+        $item = $this->seedItem($game, [
+            'slug' => 'snapshot-brainrot',
+            'name' => 'Snapshot Brainrot',
+            'rarity' => 'Secret',
+            'total_exists' => 12,
+            'attributes_json' => [
+                'rot_rocks' => [
+                    'base_cost' => 1000,
+                    'base_income' => 500,
+                    'demand' => 'HIGH',
+                    'trend' => 'rising',
+                ],
+            ],
+        ]);
+        $variant = $this->seedValue($item, $source, 250, '2026-08-30 08:30:00');
+        $this->seedObservation($variant, $source, 100, now()->subDay());
+        $this->seedObservation($variant, $source, 250, now());
+
+        Http::preventStrayRequests();
+        $this->artisan('seo:sab-wiki-catalog')
+            ->expectsOutput('SAB Wiki catalog completed.')
+            ->expectsOutput('Rows: 1')
+            ->assertSuccessful();
+
+        $payload = json_decode((string) File::get(SabWikiCatalogService::path()), true);
+        $this->assertSame(1, $payload['schema_version'] ?? null);
+        $this->assertNotEmpty($payload['generated_at'] ?? null);
+        $this->assertCount(1, $payload['rows'] ?? []);
+        $this->assertSame('snapshot-brainrot', $payload['rows'][0]['slug'] ?? null);
+        $this->assertSame(1, data_get($payload, 'summary.total'));
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $context = app(SabRenderService::class)->wikiViewContext();
+        $queries = DB::getQueryLog();
+        $sql = implode("\n", array_map(fn (array $query): string => strtolower((string) ($query['query'] ?? '')), $queries));
+
+        $this->assertSame(1, $context['wikiTotal']);
+        $this->assertStringContainsString('Snapshot Brainrot', (string) ($context['wikiRows'][0]['name'] ?? ''));
+        $this->assertStringNotContainsString('from `seo_items`', $sql);
+        $this->assertStringNotContainsString('seo_item_variants', $sql);
+        $this->assertStringNotContainsString('seo_item_current_values', $sql);
+
+        $admin = app(SabRenderService::class)->wikiTopicViewContext(SabWikiPageDefinitions::PAGE_WIKI_ADMIN_ABUSE);
+        $this->assertSame(1, $admin['wikiTotal']);
+        $this->assertSame($settingsBefore, $game->fresh()->settings_json);
+        $this->assertSame(SabWikiCatalogService::publicUrl(), SabWikiCatalogService::read()['url'] ?? null);
+
+        $dataResponse = $this->get(SabWikiCatalogService::publicUrl());
+        $dataResponse->assertOk()
+            ->assertHeader('Content-Type', 'application/json; charset=UTF-8');
+        $this->assertStringContainsString('max-age=3600', (string) $dataResponse->headers->get('Cache-Control'));
+    }
+
+    public function test_wiki_catalog_command_keeps_previous_file_when_empty(): void
+    {
+        $this->seedGame();
+        $previous = json_encode([
+            'schema_version' => 1,
+            'generated_at' => '2026-09-01T00:00:00+00:00',
+            'rows' => [['slug' => 'previous-brainrot']],
+            'summary' => ['total' => 1],
+        ], JSON_UNESCAPED_SLASHES);
+        File::ensureDirectoryExists(dirname(SabWikiCatalogService::path()));
+        File::put(SabWikiCatalogService::path(), $previous);
+
+        Http::preventStrayRequests();
+        $this->artisan('seo:sab-wiki-catalog')
+            ->expectsOutput('SAB Wiki catalog is empty; previous file was kept.')
+            ->assertFailed();
+
+        $this->assertSame($previous, File::get(SabWikiCatalogService::path()));
     }
 
     public function test_wiki_uses_database_fields_and_keeps_unknown_values_explicit(): void

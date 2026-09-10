@@ -13,7 +13,6 @@
 @php
   $existCountListHref = $urlPrefix . '/' . \App\Services\Seo\SabRenderService::PAGE_EXIST_COUNTS_LIST;
   $valueListHref = ($productUrlPrefix ?? '') . '/' . \App\Services\Seo\SabRenderService::PAGE_VALUE_LIST;
-  $august19NewsHref = rtrim((string) ($urlPrefix ?? ''), '/') . '/news/steal-a-brainrot-sab-values-market-watch-headless-horseman-rebounds-dragon-cannelloni-drops-august-19-2026';
   $wikiShortcutPrefix = rtrim((string) ($productUrlPrefix ?? $urlPrefix ?? ''), '/');
   $adminAbuseHref = $wikiShortcutPrefix . '/' . \App\Services\Seo\SabWikiPageDefinitions::PAGE_WIKI_ADMIN_ABUSE;
   $wikiHubHref = $wikiShortcutPrefix . '/' . \App\Services\Seo\SabRenderService::PAGE_WIKI;
@@ -53,17 +52,6 @@
       {{ $lastUpdateLabel ?? 'Last update' }}: <time datetime="{{ $calculatorLastUpdatedAt }}">{{ $calculatorLastUpdatedLabel }}</time>
     </p>
     @endif
-    {{--
-    @if(($locale ?? 'en') === 'en')
-    <div class="mt-2 inline-flex max-w-full items-center gap-2 text-left text-xs font-semibold leading-5 text-cyan-200">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="h-4 w-4 shrink-0 text-cyan-300" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M4 14h3l7 4V6L7 10H4v4Z"/>
-        <path stroke-linecap="round" stroke-linejoin="round" d="M17 9a3 3 0 0 1 0 6M20 7a6 6 0 0 1 0 10"/>
-      </svg>
-      <a href="{{ \App\Services\Seo\SabSiteContext::EXTERNAL_MM2_CALCULATOR_URL }}" target="_blank" rel="noopener noreferrer" class="font-semibold underline hover:text-cyan-100">New tool · MM2 Value Calculator</a>
-    </div>
-    @endif
-    --}}
   </div>
 </header>
 @endif
@@ -81,15 +69,7 @@
     </a>
   </div>
   --}}
-  <div class="flex max-w-full items-center gap-2 text-left text-xs font-semibold leading-5 text-cyan-200">
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="h-4 w-4 shrink-0 text-cyan-300" aria-hidden="true">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M4 14h3l7 4V6L7 10H4v4Z"/>
-      <path stroke-linecap="round" stroke-linejoin="round" d="M17 9a3 3 0 0 1 0 6M20 7a6 6 0 0 1 0 10"/>
-    </svg>
-    <a href="{{ $august19NewsHref }}" class="font-semibold underline hover:text-cyan-100">
-      News · Aug 19 — SAB Values: Headless Horseman rebounds, Dragon Cannelloni drops
-    </a>
-  </div>
+  @include('seo.sab.partials._trades-launch-notice', ['noticeClass' => ''])
   <div class="sab-calc-trade-pills" aria-label="Trade actions">
     <a class="sab-calc-trade-pill sab-calc-trade-pill--primary" href="{{ \App\Support\TradePaths::create() }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>

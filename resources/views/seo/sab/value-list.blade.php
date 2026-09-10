@@ -506,16 +506,7 @@
   </p>
   @endif
   @if(($locale ?? 'en') === 'en')
-  @php
-    $adminAbuseHref = rtrim((string) ($urlPrefix ?? ''), '/') . '/' . \App\Services\Seo\SabWikiPageDefinitions::PAGE_WIKI_ADMIN_ABUSE;
-  @endphp
-  <div class="mt-3 inline-flex max-w-full items-center gap-2 text-left text-xs font-semibold leading-5 text-cyan-200">
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="h-4 w-4 shrink-0 text-cyan-300" aria-hidden="true">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M4 14h3l7 4V6L7 10H4v4Z"/>
-      <path stroke-linecap="round" stroke-linejoin="round" d="M17 9a3 3 0 0 1 0 6M20 7a6 6 0 0 1 0 10"/>
-    </svg>
-    <a href="{{ $adminAbuseHref }}" class="font-semibold underline hover:text-cyan-100">New · Steal a Brainrot Admin Abuse Time Today</a>
-  </div>
+  @include('seo.sab.partials._trades-launch-notice')
   @endif
   @php
     $todayTopGainer = is_array($todayTopGainer ?? null) ? $todayTopGainer : null;
