@@ -84,15 +84,14 @@
       @endphp
       <section class="trades-card-board__panel trades-card-board__panel--{{ $side['icon'] }}">
         <header class="trades-card-board__panel-head">
-          <h2>
+          <h3>
             @if($side['icon'] === 'offer')
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h11l-3-3M17 16H6l3 3"/></svg>
             @else
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20s-7-4.4-7-10a4.2 4.2 0 0 1 7-3 4.2 4.2 0 0 1 7 3c0 5.6-7 10-7 10Z"/></svg>
             @endif
-            {{ $side['label'] }}
-            <span class="trades-card-board__count">{{ $side['items']->count() }}</span>
-          </h2>
+            {{ \App\Support\TradeSeo::cardSideTitle($side['label'], $side['items']) }}
+          </h3>
         </header>
         <div class="trades-card-board__stats">
           <span class="trades-card-board__stat trades-card-board__stat--value">

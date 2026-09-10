@@ -25,7 +25,7 @@
         <path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/>
       </svg>
     </button>
-    <h2 id="trades-auth-modal-title" class="trades-auth-modal__title" data-auth-modal-title>Sign in</h2>
+    <p id="trades-auth-modal-title" class="trades-auth-modal__title" data-auth-modal-title>Sign in</p>
     <p class="trades-auth-modal__copy" data-auth-modal-copy>Sign in to post and manage trade ads.</p>
     @if(!empty($schemaMissing))
       <p class="trades-auth-modal__status">Trade tables are not installed yet.</p>

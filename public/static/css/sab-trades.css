@@ -686,8 +686,9 @@ body.trades-app .trades-card-board__panel-head {
   margin: 0 0 0.5rem;
 }
 
-body.trades-app .trades-card-board__panel-head h2 {
+body.trades-app .trades-card-board__panel-head h3 {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
   margin: 0;
@@ -998,7 +999,7 @@ body.trades-app .trades-home-hero h1 {
 }
 
 body.trades-app .trades-home-hero__lead {
-  max-width: 40rem;
+  max-width: none;
   margin: 0 0 20px;
   color: var(--sab-text-secondary);
   font-size: 0.95rem;
@@ -1141,14 +1142,6 @@ body.trades-app .trades-home-actions__row .trades-btn {
     width: 100%;
     min-height: 48px;
   }
-}
-
-body.trades-app .trades-home-note {
-  margin: 0.9rem auto 0;
-  max-width: 40rem;
-  color: #64748b;
-  font-size: 0.75rem;
-  line-height: 1.45;
 }
 
 body.trades-app .trades-empty {

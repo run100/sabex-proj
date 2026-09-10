@@ -14,7 +14,7 @@
 </nav>
 <section class="trades-home-hero">
   <h1>Steal a Brainrot Trades</h1>
-  <p class="trades-home-hero__lead">Browse live Steal a Brainrot trades, compare SAB values, and find players looking for the items you have.</p>
+  <p class="trades-home-hero__lead">Browse live Steal a Brainrot trades posted by the community — buy, sell and trade your SAB collection. Post a trade ad, join active offers, and check SAB trade values, exist counts, mutations and traits before you make a deal.</p>
   <div class="trades-home-actions">
     <a href="{{ \App\Support\TradePaths::create() }}" class="trades-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -35,7 +35,6 @@
       </a>
     </div>
   </div>
-  <p class="trades-home-note">Community listings only. SAB Exist Count is not official Roblox, does not hold items, and does not complete trades. Finish exchanges in Roblox.</p>
 </section>
 
 <form class="trades-filter" method="get" action="/trading" data-trades-filter>
@@ -99,14 +98,14 @@
   {{ $listings->withQueryString()->onEachSide(1)->links('trades.partials.pagination') }}
 @endif
 
-<section class="trades-home-about mt-10 max-w-3xl">
+<section class="trades-home-about mt-10">
   <h2 class="text-xl font-black">About Steal a Brainrot trades</h2>
   <p class="mt-2 text-sm text-slate-400">SABExistCount lists live Steal a Brainrot trade ads so you can compare SAB values, mutations, traits and exist counts before you finish a swap in Roblox. Listings are community posts, not escrow.</p>
 </section>
 @php
   $tradeFaqs = \App\Support\TradeSeo::marketplaceFaqs();
 @endphp
-<section id="faq" class="trades-home-faq mt-8 max-w-3xl">
+<section id="faq" class="trades-home-faq mt-8">
   <h2 class="text-xl font-black">Trade FAQ</h2>
   @foreach($tradeFaqs as $faq)
     <h3 class="mt-4 text-base font-bold">{{ $faq['q'] }}</h3>

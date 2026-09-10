@@ -29,9 +29,9 @@ class ListingController extends Controller
         }
 
         $page = $this->page([
-            'seoTitle' => 'SABExistCount - Steal a Brainrot Trades, Trade Calculator & Values',
-            'seoDescription' => 'Find live Steal a Brainrot trades, post or join offers, compare SAB values, calculate W/F/L, and check mutations, traits and exist counts before trading.',
-            'seoKeywords' => 'Steal a Brainrot, trade calculator, value list, brainrot values, mutations, traits',
+            'seoTitle' => 'Steal a Brainrot Trades – Live Trade Ads | SABExistCount',
+            'seoDescription' => 'Browse live Steal a Brainrot trade ads, post your own offer, and find players looking for what you have. Check mutations, traits and demand before you trade.',
+            'seoKeywords' => 'Steal a Brainrot trades, SAB trade ads, steal a brainrot trading, post trade offer, brainrot trade list',
             'listings' => collect(),
             'wantBrainrot' => $wantBrainrot,
             'haveBrainrot' => $haveBrainrot,

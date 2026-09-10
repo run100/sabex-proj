@@ -126,21 +126,40 @@ class TradeSeoTest extends TestCase
         $this->assertSame('12', TradePresenter::compactValue(12));
     }
 
+    public function test_card_side_title_includes_counts_and_joins_items(): void
+    {
+        $this->assertSame("They're offering", TradeSeo::cardSideTitle("They're offering", []));
+        $this->assertSame(
+            "They're offering 1x Happy Rock",
+            TradeSeo::cardSideTitle("They're offering", ['Happy Rock']),
+        );
+        $this->assertSame(
+            "They're looking for 2x Happy Rock",
+            TradeSeo::cardSideTitle("They're looking for", ['Happy Rock', 'Happy Rock']),
+        );
+        $this->assertSame(
+            "They're offering 2x Happy Rock + 1x Laser Cat",
+            TradeSeo::cardSideTitle("They're offering", ['Happy Rock', 'Laser Cat', 'Happy Rock']),
+        );
+    }
+
     public function test_marketplace_faqs_cover_live_trade_flow(): void
     {
         $faqs = TradeSeo::marketplaceFaqs();
         $questions = array_column($faqs, 'q');
         $answers = implode(' ', array_column($faqs, 'a'));
 
-        $this->assertCount(5, $faqs);
-        $this->assertContains('How do I send an offer?', $questions);
-        $this->assertStringContainsString('Make Offer', $answers);
-        $this->assertStringContainsString('Mark Completed', $answers);
-        $this->assertStringContainsString('Awaiting confirmation', $answers);
-        $this->assertStringNotContainsString('Open Post a Trade', $answers);
+        $this->assertCount(6, $faqs);
+        $this->assertContains('What is Steal a Brainrot trades?', $questions);
+        $this->assertContains('Is trading on SABExistCount free?', $questions);
+        $this->assertStringContainsString('exist count', $answers);
+        $this->assertStringContainsString('win, fair or loss', $answers);
+        $this->assertStringContainsString('are free', $answers);
+        $this->assertStringNotContainsString('How do I send an offer?', implode(' ', $questions));
 
         $json = TradeSeo::marketplaceFaqJsonLd();
         $this->assertStringContainsString('"@type":"FAQPage"', $json);
-        $this->assertStringContainsString('Make Offer', $json);
+        $this->assertStringContainsString('What is Steal a Brainrot trades?', $json);
+        $this->assertStringContainsString('exist count', $json);
     }
 }

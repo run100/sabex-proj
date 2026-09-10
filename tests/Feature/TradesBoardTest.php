@@ -67,13 +67,15 @@ class TradesBoardTest extends TestCase
             ->assertSee('Noobini')
             ->assertSee('Cappuccino')
             ->assertSee('Trader')
-            ->assertSee("They're offering")
-            ->assertSee("They're looking for")
+            ->assertSee("They're offering 1x Noobini")
+            ->assertSee("They're looking for 1x Cappuccino")
             ->assertSee('Value')
             ->assertSee('Demand')
             ->assertSee('HIGH')
             ->assertSee('Waiting for trade');
         $html = $home->getContent();
+        $this->assertMatchesRegularExpression('/trades-card-board__panel-head[^>]*>\s*<h3>/', $html);
+        $this->assertDoesNotMatchRegularExpression('/trades-card-board__panel-head[^>]*>\s*<h2>/', $html);
         $this->assertSame(0, substr_count($html, 'trades-item-slot--empty'));
         $this->assertSame(2, substr_count($html, 'trades-item-slot--filled'));
         $this->assertStringContainsString('trades-card-board__arrow', $html);

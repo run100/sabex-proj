@@ -153,6 +153,38 @@ class TradeSeo
     }
 
     /**
+     * @param  iterable<int, object|array<string, mixed>|string>  $items
+     */
+    public static function cardSideTitle(string $label, iterable $items): string
+    {
+        $names = [];
+        foreach ($items as $item) {
+            if (is_string($item)) {
+                $names[] = $item;
+                continue;
+            }
+            if (is_array($item)) {
+                $names[] = (string) ($item['brainrot_name_snapshot'] ?? $item['name'] ?? '');
+                continue;
+            }
+
+            $names[] = (string) ($item->brainrot_name_snapshot ?? $item->name ?? '');
+        }
+
+        $tokens = self::collapseNames($names);
+        if ($tokens === []) {
+            return $label;
+        }
+
+        $parts = array_map(
+            static fn (array $token): string => ((int) $token['count']).'x '.$token['name'],
+            $tokens,
+        );
+
+        return $label.' '.implode(' + ', $parts);
+    }
+
+    /**
      * @param  list<string>  $offering
      * @param  list<string>  $looking
      * @return array{
@@ -261,24 +293,28 @@ class TradeSeo
     {
         return [
             [
-                'q' => 'How do I post a Steal a Brainrot trade?',
-                'a' => 'Open Create Trade Ad, fill I Have and I Want, then publish. Guests can build the ad first and sign in when they publish.',
+                'q' => 'What is Steal a Brainrot trades?',
+                'a' => 'Steal a Brainrot trades are player-to-player offers for buying, selling or swapping SAB plushies on Roblox. Here you can browse live trade ads posted by the community, post your own offer, and see what players are offering and looking for right now.',
             ],
             [
-                'q' => 'How do I send an offer?',
-                'a' => 'Open a listing and tap Make Offer. The owner can Accept or Reject. The ad stays open until they accept.',
+                'q' => 'How do I post a Steal a Brainrot trade ad?',
+                'a' => 'Create a free account, click "Post a Trade", pick the plushies you\'re offering and the ones you\'re looking for, then submit — your ad goes straight into the live list for other players to match.',
             ],
             [
-                'q' => 'Does SABExistCount complete the trade in Roblox?',
-                'a' => 'No. SABExistCount does not hold items or finish swaps. Complete the exchange in Roblox, then both players tap Mark Completed.',
+                'q' => 'What is a Steal a Brainrot exist count?',
+                'a' => 'An exist count is how many of a specific SAB plushie exist in the game. It\'s the main way players judge rarity and value before trading — lower exist count usually means rarer and more valuable.',
             ],
             [
-                'q' => 'When does a listing become Completed?',
-                'a' => 'Only after both traders mark it completed. If one player has confirmed, the listing shows Awaiting confirmation.',
+                'q' => 'How do I check if a SAB trade is a win, fair or loss (W/F/L)?',
+                'a' => 'Use our trading calculator: enter the plushies on each side, and it compares their exist counts and demand to tell you whether the trade is a win, fair or loss for you.',
             ],
             [
-                'q' => 'How do I find a Brainrot I want?',
-                'a' => 'Use Filter Trades to search by the Brainrot you want to get or the one you have to give. Each card shows value, demand, mutations, and traits.',
+                'q' => 'What are mutations and traits in Steal a Brainrot?',
+                'a' => 'Mutations and traits are special variants of plushies (like rare colors or effects) that can make them worth more. Always check them on both sides of a trade before you accept.',
+            ],
+            [
+                'q' => 'Is trading on SABExistCount free?',
+                'a' => 'Yes — browsing, posting trade ads and checking values on SABExistCount are free. No payment needed to list or match offers.',
             ],
         ];
     }
