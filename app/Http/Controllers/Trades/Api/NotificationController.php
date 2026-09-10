@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Services\Trades\TradeNotificationService;
 use App\Support\TradeApi;
 use App\Support\TradePresenter;
+use App\Support\TradeQueryRules;
 use App\Support\TradeSchema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,11 @@ class NotificationController extends Controller
     public function index(Request $request, TradeNotificationService $notifications): JsonResponse
     {
         abort_unless(TradeSchema::ready(), 404);
-        $page = $notifications->forUser(auth('trades')->user(), (int) $request->query('page', 1));
+        $input = TradeApi::validated($request, TradeQueryRules::notifications());
+        if ($input instanceof JsonResponse) {
+            return $input;
+        }
+        $page = $notifications->forUser(auth('trades')->user(), $input['page'] ?? 1);
 
         return TradeApi::ok([
             'items' => collect($page->items())->map(fn ($row) => TradePresenter::notification($row->loadMissing('listing')))->all(),

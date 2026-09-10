@@ -553,7 +553,7 @@
   }
 
   function isTradeNormalText(value) {
-    return /^[\p{L}\p{M}\p{N}\p{Zs}\r\n.,!?;:'"()\-_\/，。！？；：、（）「」『』【】《》〈〉…—–·]+$/u.test(value);
+    return /^[\p{L}\p{M}\p{N}\p{Zs}\r\n.,!?;'"()\-_，。！？；：、（）「」『』【】《》〈〉…—–·]+$/u.test(value);
   }
 
 @if($canMessage)

@@ -94,14 +94,16 @@ class TradesBoardTest extends TestCase
         $owner = $this->tradeUser('12346', 'NoteOwner');
         $buyer = $this->tradeUser('12347', 'NoteBuyer');
 
-        $this->actingAs($owner, 'trades')
-            ->postJson('http://www.sabex.lab/api/v1/trading/trades', [
-                'offering' => [['slug' => 'noobini']],
-                'looking_for' => [['slug' => 'cappuccino']],
-                'note' => '<script>alert(1)</script>',
-            ])
-            ->assertStatus(422)
-            ->assertJsonPath('error.code', 'INVALID_MESSAGE');
+        foreach (['<script>alert(1)</script>', 'https://sabexistcount.com', 'a/b', 'http:example.com'] as $note) {
+            $this->actingAs($owner, 'trades')
+                ->postJson('http://www.sabex.lab/api/v1/trading/trades', [
+                    'offering' => [['slug' => 'noobini']],
+                    'looking_for' => [['slug' => 'cappuccino']],
+                    'note' => $note,
+                ])
+                ->assertStatus(422)
+                ->assertJsonPath('error.code', 'INVALID_MESSAGE');
+        }
         $this->assertSame(0, TradeListing::query()->where('owner_user_id', $owner->id)->count());
 
         $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
@@ -116,12 +118,23 @@ class TradesBoardTest extends TestCase
 
         $confirmUrl = 'http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/confirm';
         $this->actingAs($buyer, 'trades')
-            ->postJson($confirmUrl, [
-                'confirmation' => 'completed',
-                'note' => '<div>blocked</div>',
-            ])
+            ->postJson($confirmUrl, ['confirmation' => ['completed']])
             ->assertStatus(422)
-            ->assertJsonPath('error.code', 'INVALID_MESSAGE');
+            ->assertJsonPath('error.code', 'INVALID_INPUT');
+        $this->actingAs($buyer, 'trades')
+            ->postJson($confirmUrl, ['confirmation' => 'completed', 'note' => ['blocked']])
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'INVALID_INPUT');
+
+        foreach (['<div>blocked</div>', 'https://sabexistcount.com', 'a/b', 'http:example.com'] as $note) {
+            $this->actingAs($buyer, 'trades')
+                ->postJson($confirmUrl, [
+                    'confirmation' => 'completed',
+                    'note' => $note,
+                ])
+                ->assertStatus(422)
+                ->assertJsonPath('error.code', 'INVALID_MESSAGE');
+        }
         $this->assertSame(0, TradeConfirmation::query()->where('listing_id', $listing->id)->count());
 
         $sqlNote = '; DROP TABLE seo_trade_confirmations; --';
@@ -704,7 +717,7 @@ class TradesBoardTest extends TestCase
         $otherListing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
         $url = 'http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/join';
 
-        foreach (['<script></script>', '&lt;script&gt;', "Tab\tbed", 'Hello 😀', "Hello\u{200B}World", '1=1'] as $note) {
+        foreach (['<script></script>', '&lt;script&gt;', "Tab\tbed", 'Hello 😀', "Hello\u{200B}World", '1=1', 'https://sabexistcount.com', 'a/b', 'http:example.com'] as $note) {
             $this->actingAs($buyer, 'trades')
                 ->postJson($url, ['note' => $note])
                 ->assertStatus(422)
@@ -888,7 +901,7 @@ class TradesBoardTest extends TestCase
         $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
         $url = 'http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/messages';
 
-        foreach (['Hello 😀', "Tab\tbed", "Hello\u{200B}World", "\x01control", '1=1', '2+2', '$100', 'C:\\temp'] as $message) {
+        foreach (['Hello 😀', "Tab\tbed", "Hello\u{200B}World", "\x01control", '1=1', '2+2', '$100', 'C:\\temp', 'https://sabexistcount.com', 'a/b', 'http:example.com'] as $message) {
             $response = $this->actingAs($buyer, 'trades')
                 ->postJson($url, ['message' => $message]);
             $this->assertSame(422, $response->status(), 'Unexpectedly accepted: '.json_encode($message, JSON_UNESCAPED_UNICODE));
@@ -922,8 +935,8 @@ class TradesBoardTest extends TestCase
         $this->getJson('http://www.sabex.lab/api/v1/trading/trades?sort='.rawurlencode($sortInjection)
             .'&page='.rawurlencode('1 OR 1=1')
             .'&limit='.rawurlencode('20 OR 1=1'))
-            ->assertOk()
-            ->assertJsonPath('data.items.0.public_id', $newer->public_id);
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'INVALID_INPUT');
 
         $this->getJson('http://www.sabex.lab/api/v1/trading/trades/completed?username='.rawurlencode($injection)
             .'&roblox_sub='.rawurlencode('; DROP TABLE seo_trade_users; --'))
@@ -958,6 +971,39 @@ class TradesBoardTest extends TestCase
             ->postJson($messageUrl, ['message' => '; DROP TABLE seo_trade_notifications; --'])
             ->assertCreated()
             ->assertJsonPath('data.message.message', '; DROP TABLE seo_trade_notifications; --');
+    }
+
+    public function test_public_trade_query_inputs_reject_arrays_without_500(): void
+    {
+        $publicUrls = [
+            'http://www.sabex.lab/api/v1/trading/trades?page[]=1',
+            'http://www.sabex.lab/api/v1/trading/trades?limit[]=20',
+            'http://www.sabex.lab/api/v1/trading/trades?sort[]=newest',
+            'http://www.sabex.lab/api/v1/trading/trades?want_brainrot_id[]=1',
+            'http://www.sabex.lab/api/v1/trading/trades/completed?username[]=Owner',
+            'http://www.sabex.lab/api/v1/trading/trades/completed?brainrot_id[]=1',
+            'http://www.sabex.lab/api/v1/trading/trades/pending?sort[]=newest',
+            'http://www.sabex.lab/api/v1/brainrots/search?q[]=noobini',
+            'http://www.sabex.lab/api/v1/brainrots/search?limit[]=20',
+        ];
+
+        foreach ($publicUrls as $url) {
+            $this->getJson($url)
+                ->assertStatus(422)
+                ->assertJsonPath('error.code', 'INVALID_INPUT');
+        }
+
+        $user = $this->tradeUser('55530', 'InputUser');
+        foreach ([
+            'http://www.sabex.lab/api/v1/activity?status[]=all',
+            'http://www.sabex.lab/api/v1/activity?page[]=1',
+            'http://www.sabex.lab/api/v1/notifications?page[]=1',
+        ] as $url) {
+            $this->actingAs($user, 'trades')
+                ->getJson($url)
+                ->assertStatus(422)
+                ->assertJsonPath('error.code', 'INVALID_INPUT');
+        }
     }
 
     public function test_unknown_trait_is_rejected_and_not_stored(): void

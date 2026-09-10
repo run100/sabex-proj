@@ -229,6 +229,26 @@ class TradeLaunchGuardTest extends TestCase
         $this->get('http://www.sabex.lab/trading?page=2')->assertNotFound();
     }
 
+    public function test_web_trade_query_arrays_are_rejected_before_casts(): void
+    {
+        foreach ([
+            'http://www.sabex.lab/trading?page[]=1',
+            'http://www.sabex.lab/trading?sort[]=newest',
+            'http://www.sabex.lab/trading/completed?username[]=owner',
+            'http://www.sabex.lab/trading/pending?limit[]=20',
+        ] as $url) {
+            $this->get($url)->assertNotFound();
+        }
+
+        $user = $this->tradeUser('4', 'InputUser');
+        $this->actingAs($user, 'trades')
+            ->get('http://www.sabex.lab/user/offers?status[]=sent')
+            ->assertNotFound();
+        $this->actingAs($user, 'trades')
+            ->get('http://www.sabex.lab/notifications?page[]=1')
+            ->assertNotFound();
+    }
+
     private function tradeUser(string $sub, string $name): TradeUser
     {
         return TradeUser::query()->create([

@@ -30,6 +30,7 @@
   $formatDate = fn ($date) => $date ? $date->locale($locale)->diffForHumans() : ($t['date_updated_recently'] ?? 'Updated recently');
   $mutColRowClass = 'flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3';
   $mutColNameClass = 'min-w-0 font-sans text-xs leading-snug text-slate-500 group-hover:text-cyan-300 sm:text-sm sm:text-slate-300';
+  $newHomeCount = (int) ($newHomeCount ?? 0);
 @endphp
 
 <style>
@@ -773,9 +774,6 @@
   </div>
 
   <div id="rarity-tags" class="flex flex-wrap mb-4">
-    @php
-      $newHomeCount = collect($items ?? [])->filter(fn ($item) => \App\Services\Seo\SabRenderService::isNewHomeItem($item))->count();
-    @endphp
     @foreach(($rarityTags ?? []) as $tagVal => $tagLabel)
     @php
       $tagRarityClass = $tagVal === '' ? 'rarity-filter-btn-all' : $rarityClassFor($tagVal);
@@ -1156,41 +1154,111 @@
 @section('scripts')
 <script>
   (() => {
-    const input   = document.getElementById('brainrot-search');
-    const tbody   = document.getElementById('brainrot-list');
-    let rows      = Array.from(document.querySelectorAll('#brainrot-list tr'));
-    const count   = document.getElementById('brainrot-search-count');
-    const empty   = document.getElementById('brainrot-search-empty');
+    const input = document.getElementById('brainrot-search');
+    const tbody = document.getElementById('brainrot-list');
+    const count = document.getElementById('brainrot-search-count');
+    const empty = document.getElementById('brainrot-search-empty');
     const tagBtns = Array.from(document.querySelectorAll('#rarity-tags .tag-btn'));
     const newSearchBtn = document.getElementById('brainrot-new-search');
-    const toggle  = document.getElementById('brainrot-show-all');
+    const toggle = document.getElementById('brainrot-show-all');
     const toggleWrap = document.getElementById('brainrot-show-all-wrap');
     const sortBtns = Array.from(document.querySelectorAll('[data-sort-key]'));
-    const total   = rows.length;
-    const defaultLimit    = 80;
-    const showingAll      = {!! json_encode($t['search_showing_all']) !!}.replace('{total}', total);
+    const PRODUCT_PREFIX = {!! json_encode($productUrlPrefix ?? '', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!};
+    const DATA_URL = {!! json_encode($homeDataUrl ?? '', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!};
+    let rows = {!! json_encode($ssrHomeRows ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!};
+    const defaultLimit = 80;
+    const showingAllTpl = {!! json_encode($t['search_showing_all']) !!};
     const showingFiltered = {!! json_encode($t['search_showing_filtered']) !!};
-    const showAllLabel    = {!! json_encode($t['home_show_all']) !!};
-    const showTopLabel    = {!! json_encode($t['home_show_top_10']) !!};
-    const normalize = v => v.toLowerCase().replace(/\s+/g, ' ').trim();
+    const showAllLabel = {!! json_encode($t['home_show_all']) !!};
+    const showTopLabel = {!! json_encode($t['home_show_top_10']) !!};
+    const normalize = value => String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const esc = value => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    const slugify = value => normalize(value).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const rarityClass = key => ({
+      common: 'brainrot-rarity-common',
+      rare: 'brainrot-rarity-rare',
+      epic: 'brainrot-rarity-epic',
+      legendary: 'brainrot-rarity-legendary',
+      mythic: 'brainrot-rarity-mythic',
+      'brainrot god': 'brainrot-rarity-brainrot-god',
+      secret: 'brainrot-rarity-secret',
+      og: 'brainrot-rarity-og',
+    }[key] || 'brainrot-rarity-default');
+    const signalTone = key => key === 'very_high'
+      ? 'brainrot-signal-high'
+      : (key === 'medium' ? 'brainrot-signal-medium' : 'brainrot-signal-low');
 
     let activeTag = '';
-    let expanded  = false;
+    let expanded = false;
     let activeSort = { key: '', direction: '' };
+
+    const mutationChip = (label, countValue, href, kind) => {
+      if (!label) return '';
+      const countHtml = countValue != null ? `<span class="sab-mut-chip-count">${esc(countValue)}</span>` : '';
+      const inner = `<span class="sab-mut-chip-label sab-mut-chip-label-${kind}" aria-hidden="true"></span>${countHtml}`;
+      return href
+        ? `<a href="${esc(href)}" title="${esc(label)}" onclick="event.stopPropagation()" class="sab-mut-chip">${inner}</a>`
+        : `<span class="sab-mut-chip" title="${esc(label)}">${inner}</span>`;
+    };
+
+    const mutationDesktop = (label, countValue, href) => {
+      if (!label) return '<span class="font-sans text-slate-500">—</span>';
+      const countHtml = countValue != null ? `<span class="sab-mut-count whitespace-nowrap">${esc(countValue)}</span>` : '';
+      const body = `<span class="sab-mut-name min-w-0 font-sans text-xs leading-snug text-slate-500 sm:text-sm sm:text-slate-300">${esc(label)}</span>${countHtml}`;
+      return href
+        ? `<a href="${esc(href)}" onclick="event.stopPropagation()" class="group flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">${body}</a>`
+        : `<span class="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">${body}</span>`;
+    };
+
+    const rowHtml = row => {
+      const rarity = row.r || '';
+      const badge = rarityClass(rarity);
+      const canOpen = !!row.link && !!row.s;
+      const href = canOpen ? `${PRODUCT_PREFIX}/products/${row.s}` : '';
+      const mutationHref = canOpen && row.mn ? `${href}#mutation-${slugify(row.mn)}` : '';
+      const traitHref = canOpen && row.tn ? `${href}#trait-${slugify(row.tn)}` : '';
+      const newBadge = row.nw ? '<span class="brainrot-new-pill inline-flex shrink-0 items-center">NEW</span>' : '';
+      const name = esc(row.n || '');
+      const nameBlock = row.rl
+        ? `<div class="sab-brainrot-mobile-meta brainrot-title-line"><span class="sab-brainrot-name min-w-0">${name}</span>${newBadge}<span class="brainrot-rarity-pill brainrot-inline-rarity inline-flex shrink-0 items-center ${badge}">${esc(row.rl)}</span></div><div class="sab-brainrot-name-only sab-brainrot-name">${name}${row.nw ? ' <span class="brainrot-new-pill ml-1 inline-flex align-middle">NEW</span>' : ''}</div>`
+        : `<div class="sab-brainrot-name">${name}${row.nw ? ' <span class="brainrot-new-pill ml-1 inline-flex align-middle">NEW</span>' : ''}</div>`;
+      const thumb = row.img
+        ? `<img src="${esc(row.img)}" alt="${name}" width="64" height="64" class="sab-brainrot-thumb h-14 w-14 shrink-0 object-contain sm:h-20 sm:w-20" loading="lazy" />`
+        : '<div class="sab-brainrot-thumb h-14 w-14 sm:h-20 sm:w-20 shrink-0"></div>';
+      const linkOpen = canOpen ? `<a href="${esc(href)}" class="sab-brainrot-link flex min-w-0 items-center gap-2 sm:gap-3 hover:text-cyan-300">` : '<div class="sab-brainrot-link flex min-w-0 items-center gap-2 sm:gap-3">';
+      const linkClose = canOpen ? '</a>' : '</div>';
+      let countCell = '<div class="sab-exist-count-main text-slate-600">—</div>';
+      if (row.k === 'known') countCell = `<div class="sab-exist-count-main">${esc(row.ecs)}</div>`;
+      if (row.k === 'estimated') countCell = `<div class="sab-exist-count-main text-slate-400">${esc(row.ecs)}</div><div class="mt-0.5 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-yellow-400/10 text-yellow-300" title="${name} exist count ${esc(row.ecs)}" aria-label="${name} exist count ${esc(row.ecs)}">~</div>`;
+      const mutationCell = row.mn || row.tn
+        ? `<div class="sab-mut-chips sm:hidden">${mutationChip(row.mn, row.mc, mutationHref, 'm')}${mutationChip(row.tn, row.tc, traitHref, 't')}</div><div class="hidden sm:block"><div>${mutationDesktop(row.mn, row.mc, mutationHref)}</div>${row.tn ? `<div class="mt-1">${mutationDesktop(row.tn, row.tc, traitHref)}</div>` : ''}</div>`
+        : '<span class="font-sans text-slate-500">—</span>';
+      const signal = row.ss
+        ? `<span class="brainrot-signal ${signalTone(row.sk)} inline-flex items-center font-medium" data-signal-symbol="${esc(row.ss)}" aria-hidden="true"></span>`
+        : '<span class="text-slate-600">—</span>';
+
+      return `<tr class="sab-rarity-row ${badge} transition-colors${canOpen ? ' cursor-pointer' : ''}" data-search="${esc(row.q || '')}" data-rarity="${esc(rarity)}" data-is-new="${row.nw ? '1' : '0'}" data-sort-exist="${esc(row.e ?? '')}" data-sort-tier="${esc(row.tier ?? 2)}"${canOpen ? ` onclick="location.href='${esc(href)}'"` : ''}><td class="sab-col-brainrot pl-2.5 pr-2.5 py-2 sm:px-4 sm:py-3 font-medium align-top">${linkOpen}${thumb}<div class="min-w-0 flex-1 overflow-hidden">${nameBlock}</div>${linkClose}</td><td class="sab-col-rarity px-2 py-2 sm:px-4 sm:py-3 hidden sm:table-cell align-top">${row.rl ? `<span class="brainrot-rarity-pill brainrot-table-rarity inline-flex items-center ${badge}">${esc(row.rl)}</span>` : '<span class="text-slate-600">—</span>'}</td><td class="sab-col-count sab-count-cell px-2 py-2 sm:px-4 sm:py-3 font-mono align-top tabular-nums text-sm leading-tight whitespace-nowrap">${countCell}</td><td class="sab-col-mut sab-mut-cell px-2 py-2 sm:px-4 sm:py-3 align-top font-mono tabular-nums text-sm leading-tight">${mutationCell}</td><td class="px-2 py-2 sm:px-4 sm:py-3 hidden md:table-cell align-top">${signal}</td></tr>`;
+    };
 
     const update = () => {
       const q = normalize(input.value);
       const filtered = rows.filter(row => {
-        const matchQ   = !q || normalize(row.dataset.search || '').includes(q);
-        const matchTag = !activeTag || (row.dataset.rarity || '') === activeTag;
+        const matchQ = !q || normalize(row.q || '').includes(q);
+        const matchTag = !activeTag || (row.r || '') === activeTag;
         return matchQ && matchTag;
       });
 
       const limit = expanded || q ? filtered.length : defaultLimit;
-      rows.forEach(row => row.classList.add('hidden'));
-      filtered.slice(0, limit).forEach(row => row.classList.remove('hidden'));
+      tbody.innerHTML = filtered.slice(0, limit).map(rowHtml).join('');
 
-      const total2 = activeTag ? rows.filter(r => (r.dataset.rarity || '') === activeTag).length : total;
+      const total = rows.length;
+      const showingAll = showingAllTpl.replace('{total}', total);
+      const total2 = activeTag ? rows.filter(row => (row.r || '') === activeTag).length : total;
       count.textContent = q || activeTag
         ? showingFiltered.replace('{visible}', Math.min(filtered.length, limit)).replace('{total}', filtered.length)
         : (expanded ? showingAll : showingFiltered.replace('{visible}', Math.min(defaultLimit, total2)).replace('{total}', total2));
@@ -1218,13 +1286,13 @@
 
       rows = [...rows].sort((a, b) => {
         if (key === 'exist') {
-          const at = Number.parseInt(a.dataset.sortTier || '2', 10);
-          const bt = Number.parseInt(b.dataset.sortTier || '2', 10);
+          const at = Number.parseInt(a.tier || '2', 10);
+          const bt = Number.parseInt(b.tier || '2', 10);
           if (at !== bt) return at - bt;
         }
 
-        const av = Number.parseFloat(a.dataset[`sort${key[0].toUpperCase()}${key.slice(1)}`] || '');
-        const bv = Number.parseFloat(b.dataset[`sort${key[0].toUpperCase()}${key.slice(1)}`] || '');
+        const av = Number.parseFloat(a.e ?? '');
+        const bv = Number.parseFloat(b.e ?? '');
         const aMissing = Number.isNaN(av);
         const bMissing = Number.isNaN(bv);
 
@@ -1234,10 +1302,6 @@
 
         return nextDirection === 'asc' ? av - bv : bv - av;
       });
-
-      const fragment = document.createDocumentFragment();
-      rows.forEach(row => fragment.appendChild(row));
-      tbody.appendChild(fragment);
 
       sortBtns.forEach(btn => {
         const isActive = btn.dataset.sortKey === key;
@@ -1283,6 +1347,20 @@
 
     input.addEventListener('input', update);
     update();
+
+    if (DATA_URL) {
+      fetch(DATA_URL, { credentials: 'same-origin' })
+        .then(response => {
+          if (!response.ok) throw new Error(`Exist count catalog request failed: ${response.status}`);
+          return response.json();
+        })
+        .then(payload => {
+          if (!Array.isArray(payload.rows)) throw new Error('Exist count catalog is invalid.');
+          rows = payload.rows;
+          update();
+        })
+        .catch(error => console.error('SAB home catalog failed', error));
+    }
   })();
 </script>
 @endsection

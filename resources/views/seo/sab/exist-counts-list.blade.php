@@ -956,7 +956,8 @@
   (() => {
     const PER_PAGE = {{ (int) $listPerPage }};
     const PRODUCT_PREFIX = {!! json_encode($productUrlPrefix ?? '') !!};
-    const ALL_ROWS = {!! json_encode($listRows ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!};
+    const DATA_URL = {!! json_encode($existCountsDataUrl ?? '', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!};
+    let ALL_ROWS = {!! json_encode($listRows ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!};
     const input = document.getElementById('brainrot-search');
     const tbody = document.getElementById('brainrot-list');
     const count = document.getElementById('brainrot-search-count');
@@ -966,8 +967,8 @@
     const pageInfo = document.getElementById('brainrot-page-info');
     const tagBtns = Array.from(document.querySelectorAll('#rarity-tags .tag-btn'));
     const sortBtns = Array.from(document.querySelectorAll('[data-sort-key]'));
-    const total = ALL_ROWS.length;
-    const showingAll = {!! json_encode($t['search_showing_all']) !!}.replace('{total}', total);
+    let total = ALL_ROWS.length;
+    let showingAll = {!! json_encode($t['search_showing_all']) !!}.replace('{total}', total);
     const showingFiltered = {!! json_encode($t['search_showing_filtered']) !!};
     const pageInfoTpl = {!! json_encode($t['exist_counts_list_page_info'] ?? '{start}–{end} of {total}') !!};
     const prevLabel = {!! json_encode($t['exist_counts_list_page_prev'] ?? 'Prev') !!};
@@ -1174,6 +1175,23 @@
     });
     input.addEventListener('input', () => { currentPage = 1; update(); });
     update();
+    if (DATA_URL) {
+      fetch(DATA_URL, { credentials: 'same-origin' })
+        .then(response => {
+          if (!response.ok) throw new Error(`Exist count catalog request failed: ${response.status}`);
+          return response.json();
+        })
+        .then(payload => {
+          if (!Array.isArray(payload.rows)) throw new Error('Exist count catalog is invalid.');
+          ALL_ROWS = payload.rows;
+          total = ALL_ROWS.length;
+          showingAll = {!! json_encode($t['search_showing_all']) !!}.replace('{total}', total);
+          workingRows = ALL_ROWS.slice();
+          currentPage = 1;
+          update();
+        })
+        .catch(error => console.error('SAB exist count catalog failed', error));
+    }
   })();
 </script>
 @endsection

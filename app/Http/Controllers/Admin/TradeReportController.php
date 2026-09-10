@@ -16,7 +16,10 @@ class TradeReportController extends Controller
     {
         abort_unless(TradeSchema::ready() && Schema::hasTable('seo_trade_reports'), 404);
 
-        $status = trim((string) $request->query('status', ''));
+        $data = $request->validate([
+            'status' => ['sometimes', 'nullable', 'string', Rule::in(['open', 'reviewing', 'resolved', 'dismissed'])],
+        ]);
+        $status = trim((string) ($data['status'] ?? ''));
 
         $reports = TradeReport::query()
             ->with([

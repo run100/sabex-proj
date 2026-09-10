@@ -10,6 +10,7 @@ use App\Models\SeoItemVariant;
 use App\Models\SeoSite;
 use App\Models\SeoValueSource;
 use App\Services\Seo\SabCalculatorCatalogService;
+use App\Services\Seo\SabExistCountCatalogService;
 use App\Services\Seo\SabRenderService;
 use App\Services\Seo\SabRotCalculatorSyncService;
 use Illuminate\Database\Schema\Blueprint;
@@ -27,11 +28,13 @@ class SabCalculatorRefreshTest extends TestCase
         $this->createSeoTables();
         File::ensureDirectoryExists(dirname(SabRotCalculatorSyncService::calculatorMetaPath()));
         File::delete(SabRotCalculatorSyncService::calculatorMetaPath());
+        File::delete(SabExistCountCatalogService::path());
     }
 
     protected function tearDown(): void
     {
         File::delete(SabRotCalculatorSyncService::calculatorMetaPath());
+        File::delete(SabExistCountCatalogService::path());
         File::deleteDirectory(SabCalculatorCatalogService::rootPath());
         File::delete(storage_path('app/seo/sab-price-history/refresh-test-brainrot.json'));
         File::delete(storage_path('app/seo/sab-price-history/brand-new-brainrot.json'));
@@ -203,6 +206,7 @@ class SabCalculatorRefreshTest extends TestCase
         $this->assertSame(2, data_get($manifest, 'counts.value_list_rows'));
         $this->assertNotEmpty($manifest['bootstrap'] ?? null);
         $this->assertNotEmpty($manifest['value_list'] ?? null);
+        $this->assertArrayNotHasKey('exist_count_list', $manifest);
         $this->assertCount(1, $manifest['chunks'] ?? []);
         $bootstrapPath = SabCalculatorCatalogService::releaseBootstrapPath((string) ($manifest['version'] ?? ''));
         $this->assertFileExists($bootstrapPath);
@@ -238,6 +242,9 @@ class SabCalculatorRefreshTest extends TestCase
         $valueListDataResponse->assertOk()
             ->assertHeader('Content-Type', 'application/json; charset=UTF-8');
         $this->assertStringContainsString('immutable', (string) $valueListDataResponse->headers->get('Cache-Control'));
+
+        $this->assertFileDoesNotExist(SabCalculatorCatalogService::releasePath((string) ($manifest['version'] ?? '')).'/exist-count-list.json');
+        $this->assertFileDoesNotExist(SabExistCountCatalogService::path());
 
         $firstSyncedAt = $meta['synced_at'];
         $this->travel(2)->seconds();
@@ -364,12 +371,34 @@ class SabCalculatorRefreshTest extends TestCase
         $firstVersion = (string) ($manifest['version'] ?? '');
         $this->assertSame(1, data_get($manifest, 'counts.items'));
         $this->assertSame(2, data_get($manifest, 'counts.mutations'));
+        $this->assertArrayNotHasKey('exist_count_list', $manifest);
         $this->assertCount(1, $manifest['chunks'] ?? []);
         $this->assertFileExists(SabCalculatorCatalogService::releaseBootstrapPath($firstVersion));
         $this->assertFileExists(SabCalculatorCatalogService::releasePath($firstVersion).'/value-list.json');
         $this->assertSame($historyBefore, File::get($historyPath));
         $this->assertSame($currentValuesBefore, SeoItemCurrentValue::query()->orderBy('id')->pluck('value_normalized')->all());
         $this->assertSame($observationsBefore, SeoItemObservation::query()->count());
+
+        $calculatorManifestBeforeExistRefresh = File::get(SabCalculatorCatalogService::manifestPath());
+        $this->artisan('seo:sab-exist-count-refresh')
+            ->expectsOutput('SAB exist count catalog completed.')
+            ->expectsOutput('Rows: 1')
+            ->assertSuccessful();
+        $existData = json_decode((string) File::get(SabExistCountCatalogService::path()), true);
+        $this->assertSame(1, count($existData['rows'] ?? []));
+        $this->assertIsArray($existData['home'] ?? null);
+        $this->assertNotEmpty($existData['generated_at'] ?? null);
+        $existDataBeforeCalculatorRefresh = File::get(SabExistCountCatalogService::path());
+        $this->assertSame($calculatorManifestBeforeExistRefresh, File::get(SabCalculatorCatalogService::manifestPath()));
+
+        $homeResponse = $this->get('http://www.sabex.lab/');
+        $homeResponse->assertOk()->assertSee(SabExistCountCatalogService::publicUrl(), false);
+        $existCountResponse = $this->get('http://www.sabex.lab/sab-exist-count-list');
+        $existCountResponse->assertOk()->assertSee(SabExistCountCatalogService::publicUrl(), false);
+        $existDataResponse = $this->get('http://www.sabex.lab'.SabExistCountCatalogService::publicUrl());
+        $existDataResponse->assertOk()
+            ->assertHeader('Content-Type', 'application/json; charset=UTF-8');
+        $this->assertStringContainsString('max-age=3600', (string) $existDataResponse->headers->get('Cache-Control'));
 
         $this->travel(2)->seconds();
         $this->artisan('seo:sab-calculator-catalog')->assertSuccessful();
@@ -378,6 +407,7 @@ class SabCalculatorRefreshTest extends TestCase
         $this->assertFileExists(SabCalculatorCatalogService::releaseBootstrapPath((string) ($secondManifest['version'] ?? '')));
         $this->assertFileExists(SabCalculatorCatalogService::releasePath((string) ($secondManifest['version'] ?? '')).'/value-list.json');
         $this->assertFileExists(SabCalculatorCatalogService::releaseBootstrapPath($firstVersion));
+        $this->assertSame($existDataBeforeCalculatorRefresh, File::get(SabExistCountCatalogService::path()));
     }
 
     public function test_catalog_command_keeps_previous_manifest_when_local_catalog_is_empty(): void
@@ -412,6 +442,36 @@ class SabCalculatorRefreshTest extends TestCase
 
         $this->assertSame($oldManifest, json_decode((string) File::get(SabCalculatorCatalogService::manifestPath()), true));
         $this->assertFileExists($oldBootstrapPath);
+    }
+
+    public function test_exist_count_command_keeps_previous_file_when_local_catalog_is_empty(): void
+    {
+        $site = SeoSite::query()->create([
+            'slug' => SabRenderService::SITE_SLUG,
+            'name' => 'SAB',
+            'settings_json' => [],
+        ]);
+        SeoGame::query()->create([
+            'seo_site_id' => $site->id,
+            'slug' => 'steal-a-brainrot',
+            'name' => 'Steal a Brainrot',
+        ]);
+
+        $previous = json_encode([
+            'schema_version' => 1,
+            'generated_at' => '2026-09-09T00:00:00+00:00',
+            'rows' => [['n' => 'Previous Item']],
+            'home' => ['stats' => ['total' => 1]],
+        ], JSON_UNESCAPED_SLASHES);
+        File::ensureDirectoryExists(dirname(SabExistCountCatalogService::path()));
+        File::put(SabExistCountCatalogService::path(), $previous);
+
+        Http::preventStrayRequests();
+        $this->artisan('seo:sab-exist-count-refresh')
+            ->expectsOutput('Exist count catalog is empty; previous file was kept.')
+            ->assertFailed();
+
+        $this->assertSame($previous, File::get(SabExistCountCatalogService::path()));
     }
 
     private function createSeoTables(): void

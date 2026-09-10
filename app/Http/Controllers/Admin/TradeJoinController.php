@@ -9,6 +9,7 @@ use App\Support\TradeSchema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 class TradeJoinController extends Controller
 {
@@ -18,7 +19,17 @@ class TradeJoinController extends Controller
     {
         abort_unless(TradeSchema::ready() && Schema::hasTable('seo_trade_join_requests'), 404);
 
-        $status = trim((string) $request->query('status', ''));
+        $data = $request->validate([
+            'status' => ['sometimes', 'nullable', 'string', Rule::in([
+                TradeJoinRequest::STATUS_REQUESTED,
+                TradeJoinRequest::STATUS_ACCEPTED,
+                TradeJoinRequest::STATUS_REJECTED,
+                TradeJoinRequest::STATUS_AUTO_REJECTED,
+                TradeJoinRequest::STATUS_CANCELLED,
+                TradeJoinRequest::STATUS_EXPIRED,
+            ])],
+        ]);
+        $status = trim((string) ($data['status'] ?? ''));
 
         $joins = TradeJoinRequest::query()
             ->with([

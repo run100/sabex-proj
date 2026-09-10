@@ -6,6 +6,7 @@ use App\Exceptions\TradeException;
 use App\Http\Controllers\Controller;
 use App\Services\Trades\BrainrotCatalogService;
 use App\Support\TradeApi;
+use App\Support\TradeQueryRules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -13,8 +14,13 @@ class BrainrotController extends Controller
 {
     public function search(Request $request, BrainrotCatalogService $catalog): JsonResponse
     {
+        $input = TradeApi::validated($request, TradeQueryRules::brainrotSearch());
+        if ($input instanceof JsonResponse) {
+            return $input;
+        }
+
         return TradeApi::ok([
-            'items' => $catalog->searchBrainrots((string) $request->query('q', ''), (int) $request->query('limit', 20)),
+            'items' => $catalog->searchBrainrots($input['q'] ?? '', $input['limit'] ?? 20),
         ]);
     }
 

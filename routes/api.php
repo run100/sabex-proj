@@ -27,7 +27,7 @@ Route::middleware([TradeApiNoIndex::class, 'cache.private'])->prefix('api/v1')->
         Route::get('/activity', [TradeController::class, 'activity']);
         Route::get('/notifications', [NotificationController::class, 'index']);
         Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
-        Route::post('/notifications/{id}/read', [NotificationController::class, 'read']);
+        Route::post('/notifications/{id}/read', [NotificationController::class, 'read'])->whereNumber('id');
         Route::post('/notifications/read-all', [NotificationController::class, 'readAll']);
         Route::post('/trading/trades', [TradeController::class, 'store']);
         Route::post('/trading/trades/{ulid}/cancel', [TradeController::class, 'cancel'])->where('ulid', TradePaths::ULID);

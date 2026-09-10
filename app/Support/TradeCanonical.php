@@ -18,6 +18,7 @@ class TradeCanonical
         $hasExtra = $query !== [];
         $pageNum = 1;
         if ($page !== null && $page !== '' && $page !== '1') {
+            abort_unless(is_int($page) || is_string($page), 404);
             $pageNum = (int) $page;
         }
         $origin = rtrim(SabHost::origin('www'), '/');
@@ -37,6 +38,9 @@ class TradeCanonical
         $raw = $request->query('page');
         if ($raw === null || $raw === '') {
             return;
+        }
+        if (! is_int($raw) && ! is_string($raw)) {
+            abort(404);
         }
         if (! is_numeric($raw) || (string) (int) $raw !== (string) $raw || (int) $raw < 1) {
             abort(404);

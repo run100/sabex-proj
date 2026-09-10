@@ -217,7 +217,8 @@ php83 scripts/export-sab-to-mysql.php
 | `storage/app/seo/sab-i18n.json` | 站点文案翻译 |
 | `storage/app/seo/sab-exist-count-gallery.json` | gallery |
 | `storage/app/calc/sab/meta.json` | 计算器 meta |
-| `storage/app/calc/sab/catalog/` | 计算器 Catalog、value-list manifest、完整索引与分片 |
+| `storage/app/calc/sab/catalog/` | 计算器 Catalog、value-list manifest、完整索引与 mutation 分片 |
+| `storage/app/seo/sab-exist-count-list.json` | 独立 Exist Count 首页与列表数据 |
 | `storage/app/seo/sab-price-history/{slug}.json` | 现 561 个文件（新商品可能还没有；商品页读不到也不 500） |
 | `resources/seo/sab/rebirths.json` | Wiki rebirth 指南 |
 
@@ -242,7 +243,15 @@ php83 artisan seo:sab-calculator-refresh
 php83 artisan seo:sab-calculator-catalog
 ```
 
-这个命令只读取本站商品、变体、当前值和 `storage/app/calc/sab/meta.json`，生成 manifest、完整物品索引和 mutation 分片。`seo:sab-calculator-refresh` 保留兼容行为，完成 rot.rocks 同步后仍会自动生成一次 Catalog。
+这个命令只读取本站商品、变体、当前值和 `storage/app/calc/sab/meta.json`，生成 Calculator manifest、完整物品索引、mutation 分片和 value-list。首页与 `/sab-exist-count-list` 的低频 Exist Count 数据由独立命令生成，不再写入 Calculator Catalog。
+
+如果只需要更新首页和 Exist Count List：
+
+```bash
+php83 artisan seo:sab-exist-count-refresh
+```
+
+这个命令只读取本站 MySQL 和本地数据，不访问 rot.rocks，原子写入 `storage/app/seo/sab-exist-count-list.json`。页面通过 `/data/seo/sab-exist-count-list.json` 读取它。`seo:sab-calculator-refresh` 不会更新这份低频 Exist Count 数据。
 
 ### 3. 再把 GEOFlow 最新业务数据同步过来（已按 upsert 做）
 
@@ -292,7 +301,8 @@ GEOFlow 的同名命令（preview → 有变化才 sync → render）**不再作
 
 1. sabex 每天跑 `seo:sab-calculator-refresh`，自己打 rot.rocks 更新当前价、traits、新品、`{slug}.json` 和 Catalog
 2. GEOFlow 继续采集 / 人工改新闻、wiki、exist count、codes
-3. 需要时再跑 upsert 版 export，把新闻 / wiki / exist / codes 同步到 sabex（不要覆盖观测和价格 JSON；calculator-meta 以本站日更为准）
+3. Exist Count 低频更新时运行 `seo:sab-exist-count-refresh`，写入独立 `storage/app/seo/sab-exist-count-list.json`
+4. 需要时再跑 upsert 版 export，把新闻 / wiki / exist / codes 同步到 sabex（不要覆盖观测和价格 JSON；calculator-meta 以本站日更为准）
 
 ## 硬约束
 

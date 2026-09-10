@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\Trades\TradeListingService;
 use App\Support\TradeCanonical;
 use App\Support\TradePaths;
+use App\Support\TradeQueryRules;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -16,7 +17,8 @@ class PendingController extends Controller
     public function __invoke(Request $request, TradeListingService $listings): View
     {
         $this->requireSchema();
-        $page = $listings->pending($request->only(['page', 'limit', 'sort']));
+        $filters = $this->validatedQuery($request, TradeQueryRules::pendingListings());
+        $page = $listings->pending($filters);
         $this->assertListPage($request, $page);
         $seo = TradeCanonical::forList(TradePaths::pending(), $request);
 

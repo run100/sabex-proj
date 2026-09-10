@@ -8,6 +8,7 @@ use App\Services\Trades\TradeActivityService;
 use App\Support\TradeCanonical;
 use App\Support\TradePaths;
 use App\Support\TradeProfileAccess;
+use App\Support\TradeQueryRules;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -18,10 +19,8 @@ class ActivityController extends Controller
     public function __invoke(Request $request, TradeActivityService $activity): View
     {
         $this->requireSchema();
-        $status = (string) $request->query('status', 'received');
-        if (! in_array($status, ['ads', 'received', 'sent', 'pending', 'completed', 'expired'], true)) {
-            $status = 'received';
-        }
+        $input = $this->validatedQuery($request, TradeQueryRules::webActivity());
+        $status = $input['status'] ?? 'received';
         /** @var TradeUser $user */
         $user = auth('trades')->user();
         $profileName = $user->display_name ?: $user->username;
@@ -52,7 +51,7 @@ class ActivityController extends Controller
             'tabCopy' => $tabCopy,
             'breadcrumbParent' => $breadcrumbParent,
             'counts' => $activity->countsForUser($user),
-            'listings' => $activity->forUser($user, $status, (int) $request->query('page', 1)),
+            'listings' => $activity->forUser($user, $status, $input['page'] ?? 1),
         ]));
     }
 }

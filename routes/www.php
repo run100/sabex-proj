@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Seo\SabCalculatorCatalogController;
+use App\Http\Controllers\Seo\SabExistCountController;
 use App\Http\Controllers\Seo\SabPublicController;
 use App\Services\Seo\SabRenderService;
 use App\Services\Seo\SabWikiPageDefinitions;
@@ -22,6 +23,7 @@ Route::get('/data/calc/sab/releases/{version}/bootstrap.json', [SabCalculatorCat
     ->where('version', '[a-z0-9][a-z0-9-]*');
 Route::get('/data/calc/sab/releases/{version}/value-list.json', [SabCalculatorCatalogController::class, 'valueList'])
     ->where('version', '[a-z0-9][a-z0-9-]*');
+Route::get('/data/seo/sab-exist-count-list.json', [SabExistCountController::class, 'data']);
 Route::get('/data/calc/sab/releases/{version}/chunks/{chunk}.json', [SabCalculatorCatalogController::class, 'chunk'])
     ->where([
         'version' => '[a-z0-9][a-z0-9-]*',

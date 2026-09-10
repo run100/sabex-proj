@@ -1606,12 +1606,26 @@ class SabRenderService
             ->firstOrFail();
 
         $baseUrl = rtrim($site->base_url ?: 'https://sabexistcount.com', '/');
-        $items = $this->loadItems($game);
         $i18n = $this->loadI18n($site);
         $t = $this->mergeSabTranslations($locale, $i18n);
         // Preview runs on the local dev server; use preview-rooted prefix so
         // product links resolve to /seo/sab/preview/products/xxx.html
         $urlPrefix = self::localizedPreviewPath($locale);
+
+        $catalogData = SabExistCountCatalogService::read();
+        if ($catalogData !== null) {
+            return $this->homeViewPayload(
+                $urlPrefix,
+                $locale,
+                $baseUrl,
+                $t,
+                collect(),
+                self::CSS_HREF_LARAVEL,
+                $catalogData,
+            );
+        }
+
+        $items = $this->loadItems($game);
 
         return $this->homeViewPayload($urlPrefix, $locale, $baseUrl, $t, $items, self::CSS_HREF_LARAVEL);
     }
@@ -1626,10 +1640,24 @@ class SabRenderService
             ->firstOrFail();
 
         $baseUrl = rtrim($site->base_url ?: 'https://sabexistcount.com', '/');
-        $items = $this->loadItems($game);
         $i18n = $this->loadI18n($site);
         $t = $this->mergeSabTranslations($locale, $i18n);
         $urlPrefix = self::localizedPreviewPath($locale);
+
+        $catalogData = SabExistCountCatalogService::read();
+        if ($catalogData !== null) {
+            return $this->existCountsListViewPayload(
+                $urlPrefix,
+                $locale,
+                $baseUrl,
+                $t,
+                collect(),
+                self::CSS_HREF_LARAVEL,
+                $catalogData,
+            );
+        }
+
+        $items = $this->loadItems($game);
 
         return $this->existCountsListViewPayload($urlPrefix, $locale, $baseUrl, $t, $items, self::CSS_HREF_LARAVEL);
     }
@@ -4350,61 +4378,102 @@ class SabRenderService
     /**
      * @return array<string, mixed>
      */
-    private function homeViewPayload(string $urlPrefix, string $locale, string $baseUrl, array $t, Collection $items, string $cssHref): array
+    private function homeViewPayload(
+        string $urlPrefix,
+        string $locale,
+        string $baseUrl,
+        array $t,
+        Collection $items,
+        string $cssHref,
+        ?array $catalogData = null,
+    ): array
     {
         $hreflang = $this->hreflangLinks('index.html', $baseUrl, self::HOME_LOCALES);
-        $listedItems = self::listedItems($items);
+        $homeRows = [];
+        $ssrHomeRows = [];
+        $homeDataUrl = null;
+        $newHomeCount = 0;
 
-        // Main `#brainrot-list` uses its own ordering; summaries / sidebar blocks stay on listed items.
-        $tableItems = $this->sortItemsForHomeTable($listedItems);
+        if ($catalogData !== null) {
+            $home = is_array($catalogData['home'] ?? null) ? $catalogData['home'] : [];
+            $tableItems = collect();
+            $stats = is_array($home['stats'] ?? null) ? $home['stats'] : ['total' => 0, 'lowest' => null, 'highest' => null];
+            $topRareItems = collect(is_array($home['topRareItems'] ?? null) ? $home['topRareItems'] : []);
+            $recentlyChangedItems = collect(is_array($home['recentlyChangedItems'] ?? null) ? $home['recentlyChangedItems'] : [])
+                ->map(function (array $entry): array {
+                    if (! empty($entry['latestDate'])) {
+                        try {
+                            $entry['latestDate'] = Carbon::parse((string) $entry['latestDate']);
+                        } catch (\Throwable) {
+                            $entry['latestDate'] = null;
+                        }
+                    }
 
-        $existCounts = $listedItems->pluck('total_exists')->filter()->values();
+                    return $entry;
+                })
+                ->values();
+            $rarityTagCounts = is_array($home['rarityTagCounts'] ?? null) ? $home['rarityTagCounts'] : ['' => 0];
+            $newHomeCount = (int) ($home['newCount'] ?? 0);
+            $homeRows = array_values($catalogData['rows'] ?? []);
+            $ssrHomeRows = array_slice($homeRows, 0, 80);
+            $homeDataUrl = (string) ($catalogData['url'] ?? '');
+        } else {
+            $listedItems = self::listedItems($items);
 
-        $stats = [
-            'total'   => $listedItems->count(),
-            'lowest'  => $existCounts->min(),
-            'highest' => $existCounts->max(),
-        ];
+            // Main `#brainrot-list` uses its own ordering; summaries / sidebar blocks stay on listed items.
+            $tableItems = $this->sortItemsForHomeTable($listedItems);
+            $homeRows = $this->buildExistCountsListRows($tableItems);
+            $ssrHomeRows = array_slice($homeRows, 0, 80);
+            $newHomeCount = $tableItems->filter(fn (SeoItem $item): bool => self::isNewHomeItem($item))->count();
 
-        $itemSummary = function (SeoItem $item): array {
-            $latestDate = $item->variants
-                ->flatMap(fn ($variant) => $variant->currentValues)
-                ->map(fn ($cv) => $cv->changed_at ?: $cv->collected_at)
-                ->filter()
-                ->sortDesc()
-                ->first();
-
-            $imageSrc = self::listingImageSrc($item);
-            $cvBySource = self::mergedCvBySourceForVariants($item->variants);
-
-            return [
-                'item'         => $item,
-                'name'         => $item->name,
-                'slug'         => self::productPublicSlug($item->slug),
-                'rarity'       => $item->rarity,
-                'imageSrc'     => $imageSrc,
-                'existCount'   => $item->total_exists,
-                'value'        => self::preferValueFromCvBySource($cvBySource),
-                'latestDate'   => $latestDate,
+            $existCounts = $listedItems->pluck('total_exists')->filter()->values();
+            $stats = [
+                'total'   => $listedItems->count(),
+                'lowest'  => $existCounts->min(),
+                'highest' => $existCounts->max(),
             ];
-        };
 
-        $summaries = $listedItems
-            ->filter(fn (SeoItem $item) => self::shouldLinkProduct($item))
-            ->map($itemSummary);
+            $itemSummary = function (SeoItem $item): array {
+                $latestDate = $item->variants
+                    ->flatMap(fn ($variant) => $variant->currentValues)
+                    ->map(fn ($cv) => $cv->changed_at ?: $cv->collected_at)
+                    ->filter()
+                    ->sortDesc()
+                    ->first();
 
-        $topRareItems = $summaries
-            ->filter(fn ($entry) => $entry['existCount'] !== null
-                && self::canonicalRarityKey($entry['rarity'] ?? null) === 'og')
-            ->sortBy(fn ($entry) => sprintf('%012d-%s', (int) $entry['existCount'], strtolower($entry['name'])))
-            ->take(10)
-            ->values();
+                $imageSrc = self::listingImageSrc($item);
+                $cvBySource = self::mergedCvBySourceForVariants($item->variants);
 
-        $recentlyChangedItems = $summaries
-            ->filter(fn ($entry) => $entry['latestDate'] !== null && $entry['existCount'] !== null)
-            ->sortByDesc('latestDate')
-            ->take(8)
-            ->values();
+                return [
+                    'item'         => $item,
+                    'name'         => $item->name,
+                    'slug'         => self::productPublicSlug($item->slug),
+                    'rarity'       => $item->rarity,
+                    'imageSrc'     => $imageSrc,
+                    'existCount'   => $item->total_exists,
+                    'value'        => self::preferValueFromCvBySource($cvBySource),
+                    'latestDate'   => $latestDate,
+                ];
+            };
+
+            $summaries = $listedItems
+                ->filter(fn (SeoItem $item) => self::shouldLinkProduct($item))
+                ->map($itemSummary);
+
+            $topRareItems = $summaries
+                ->filter(fn ($entry) => $entry['existCount'] !== null
+                    && self::canonicalRarityKey($entry['rarity'] ?? null) === 'og')
+                ->sortBy(fn ($entry) => sprintf('%012d-%s', (int) $entry['existCount'], strtolower($entry['name'])))
+                ->take(10)
+                ->values();
+
+            $recentlyChangedItems = $summaries
+                ->filter(fn ($entry) => $entry['latestDate'] !== null && $entry['existCount'] !== null)
+                ->sortByDesc('latestDate')
+                ->take(8)
+                ->values();
+            $rarityTagCounts = $this->rarityTagCounts($tableItems);
+        }
 
         $seoTitle = $t['meta_title'] ?? 'Steal a Brainrot Exist Count Tracker | SAB Values & Rarity';
         $seoDescription = $t['meta_description']
@@ -4424,18 +4493,59 @@ class SabRenderService
             'canonical'      => $homeUrl,
             'seoTitle'       => $seoTitle,
             'seoDescription' => $seoDescription,
-            'items'          => $tableItems,
+            'items'          => $catalogData !== null ? $this->homeSsrItems($ssrHomeRows) : $tableItems,
+            'homeRows'       => $homeRows,
+            'ssrHomeRows'    => $ssrHomeRows,
+            'homeDataUrl'    => $homeDataUrl,
             'topRareItems'   => $topRareItems,
             'recentlyChangedItems' => $recentlyChangedItems,
             'stats'          => $stats,
             'wikiHref'       => rtrim($this->productUrlPrefix($urlPrefix), '/').'/'.self::PAGE_WIKI,
             'rarityTags'     => $this->rarityFilterTags($t),
-            'rarityTagCounts' => $this->rarityTagCounts($tableItems),
+            'rarityTagCounts' => $rarityTagCounts,
+            'newHomeCount'   => $newHomeCount,
             'statsMonthYear' => $this->formatStatsMonthYear($locale),
             'websiteJsonLd'  => $this->websiteJsonLd($baseUrl, $seoDescription),
             'jsonLd'         => $jsonLd,
             'cssHref'        => $cssHref,
         ];
+    }
+
+    /**
+     * Recreate only the small SSR subset expected by the existing home row
+     * template. The complete row set is rendered by the browser from JSON.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return Collection<int, SeoItem>
+     */
+    private function homeSsrItems(array $rows): Collection
+    {
+        return collect($rows)->map(function (array $row): SeoItem {
+            $isNew = (bool) ($row['nw'] ?? false);
+            $attributes = [
+                'rot_rocks' => [
+                    'first_seen_at' => $isNew
+                        ? now()->subDay()->toIso8601String()
+                        : now()->subDays(30)->toIso8601String(),
+                ],
+            ];
+
+            return new SeoItem([
+                'slug' => (string) ($row['s'] ?? ''),
+                'name' => (string) ($row['n'] ?? ''),
+                'rarity' => (string) ($row['r'] ?? ''),
+                'is_publish_html' => (bool) ($row['link'] ?? false),
+                'image_url' => (string) ($row['img'] ?? ''),
+                'total_exists' => ($row['k'] ?? '') === 'known' ? (int) ($row['e'] ?? 0) : null,
+                'exist_estimate_low' => ($row['k'] ?? '') === 'estimated' ? (int) ($row['el'] ?? 0) : null,
+                'exist_estimate_high' => ($row['k'] ?? '') === 'estimated' ? (int) ($row['eh'] ?? 0) : null,
+                'rarest_mutation_name' => (string) ($row['mn'] ?? ''),
+                'rarest_mutation_count' => $row['mcr'] ?? null,
+                'rarest_trait_name' => (string) ($row['tn'] ?? ''),
+                'rarest_trait_count' => $row['tcr'] ?? null,
+                'attributes_json' => $attributes,
+            ]);
+        })->values();
     }
 
     private function formatStatsMonthYear(string $locale): string
@@ -4455,9 +4565,32 @@ class SabRenderService
     /**
      * @return array<string, mixed>
      */
-    private function existCountsListViewPayload(string $urlPrefix, string $locale, string $baseUrl, array $t, Collection $allItems, string $cssHref): array
+    private function existCountsListViewPayload(
+        string $urlPrefix,
+        string $locale,
+        string $baseUrl,
+        array $t,
+        Collection $allItems,
+        string $cssHref,
+        ?array $catalogData = null,
+    ): array
     {
-        $filtered = $this->sortItemsForHomeTable(self::listedItems($allItems));
+        if ($catalogData !== null) {
+            $filtered = collect();
+            $listRows = array_values($catalogData['rows'] ?? []);
+            $ssrRows = array_slice($listRows, 0, self::EXIST_COUNTS_LIST_PER_PAGE);
+            $listStatTotal = count($listRows);
+            $rarityTagCounts = is_array($catalogData['home']['rarityTagCounts'] ?? null)
+                ? $catalogData['home']['rarityTagCounts']
+                : ['' => $listStatTotal];
+            $existCountsDataUrl = (string) ($catalogData['url'] ?? '');
+        } else {
+            $filtered = $this->sortItemsForHomeTable(self::listedItems($allItems));
+            $listRows = $this->buildExistCountsListRows($filtered);
+            $ssrRows = array_slice($listRows, 0, self::EXIST_COUNTS_LIST_PER_PAGE);
+            $listStatTotal = $filtered->count();
+            $rarityTagCounts = $this->rarityTagCounts($filtered);
+        }
 
         $monthLabel = $this->localizedMonthLabel(Carbon::now(), $locale);
         $withMonth = function (string $template, string $fallback) use ($monthLabel): string {
@@ -4488,7 +4621,6 @@ class SabRenderService
         );
 
         $pageUrl = $this->localePublicUrl($baseUrl, $locale, self::PAGE_EXIST_COUNTS_LIST);
-        $listRows = $this->buildExistCountsListRows($filtered);
         $faqItems = $this->buildExistCountsListFaqItems($t, $baseUrl, $locale);
 
         return [
@@ -4503,12 +4635,13 @@ class SabRenderService
             'seoTitle'       => $seoTitle,
             'seoDescription' => $seoDescription,
             'items'          => $filtered,
-            'ssrItems'       => $filtered->take(self::EXIST_COUNTS_LIST_PER_PAGE)->values(),
-            'listRows'       => $listRows,
+            'ssrItems'       => $ssrRows,
+            'listRows'       => $ssrRows,
+            'existCountsDataUrl' => $existCountsDataUrl,
             'listPerPage'    => self::EXIST_COUNTS_LIST_PER_PAGE,
-            'listStatTotal'  => $filtered->count(),
+            'listStatTotal'  => $listStatTotal,
             'rarityTags'     => $this->rarityFilterTags($t),
-            'rarityTagCounts' => $this->rarityTagCounts($filtered),
+            'rarityTagCounts' => $rarityTagCounts,
             'existCountsListFaqItems' => $faqItems,
             'websiteJsonLd'  => $this->websiteJsonLd($baseUrl, $seoDescription),
             'jsonLd'         => $this->valueListPageJsonLd($seoTitle, $seoDescription, $pageUrl, $locale, $faqItems),
@@ -4628,15 +4761,19 @@ class SabRenderService
                 'rl' => $rarityLabel,
                 'e' => $ecSort,
                 'tier' => $ecSortTier,
+                'el' => $ecDisplay['kind'] === 'estimated' ? $item->exist_estimate_low : null,
+                'eh' => $ecDisplay['kind'] === 'estimated' ? $item->exist_estimate_high : null,
                 'img' => (string) (self::listingImageSrc($item) ?? ''),
                 'q' => $searchText,
                 'k' => $ecDisplay['kind'],
                 'ecs' => $ecs,
                 'mn' => $mutationLabel,
+                'mcr' => $item->rarest_mutation_count,
                 'mc' => $item->rarest_mutation_count !== null
                     ? self::formatLargeNumber((float) $item->rarest_mutation_count)
                     : null,
                 'tn' => $traitLabel,
+                'tcr' => $item->rarest_trait_count,
                 'tc' => $item->rarest_trait_count !== null
                     ? self::formatLargeNumber((float) $item->rarest_trait_count)
                     : null,

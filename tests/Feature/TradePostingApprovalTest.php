@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\SeoGame;
 use App\Models\SeoItem;
 use App\Models\SeoSite;
+use App\Models\SeoUser;
 use App\Models\TradeEmailCode;
 use App\Models\TradeEvent;
 use App\Models\TradeJoinRequest;
@@ -14,7 +15,6 @@ use App\Models\TradeListingItemTrait;
 use App\Models\TradeNotification;
 use App\Models\TradeReport;
 use App\Models\TradeUser;
-use App\Models\SeoUser;
 use App\Services\Seo\SabRenderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesSabWikiTables;
@@ -312,11 +312,36 @@ class TradePostingApprovalTest extends TestCase
             ->assertJsonPath('listing.views_count', 12);
         $this->assertNotEmpty($updated->json('listing.expires_at'));
 
+        foreach (['<script>alert(1)</script>', 'https://sabexistcount.com', 'a/b', ['blocked']] as $note) {
+            $this->actingAs($admin, 'admin')
+                ->patchJson('http://x.sabex.lab/api/trade-listings/'.$listing->id, ['note' => $note])
+                ->assertStatus(422);
+            $this->assertSame('admin note', $listing->fresh()->note);
+        }
+
+        $sqlNote = '; DROP TABLE seo_trade_listings; --';
+        $this->actingAs($admin, 'admin')
+            ->patchJson('http://x.sabex.lab/api/trade-listings/'.$listing->id, ['note' => $sqlNote])
+            ->assertOk()
+            ->assertJsonPath('listing.note', $sqlNote);
+
         $this->actingAs($admin, 'admin')
             ->patchJson('http://x.sabex.lab/api/trade-listings/'.$listing->id, [
                 'result_snapshot' => 'maybe',
             ])
             ->assertStatus(422);
+
+        foreach ([
+            'http://x.sabex.lab/api/trade-listings?q[]=owner',
+            'http://x.sabex.lab/api/trade-listings?status[]=open',
+            'http://x.sabex.lab/api/trade-joins?status[]=requested',
+            'http://x.sabex.lab/api/trade-reports?status[]=open',
+            'http://x.sabex.lab/api/trade-users?q[]=owner',
+        ] as $url) {
+            $this->actingAs($admin, 'admin')
+                ->getJson($url)
+                ->assertStatus(422);
+        }
     }
 
     public function test_admin_can_unhide_or_force_close_hidden_listings(): void

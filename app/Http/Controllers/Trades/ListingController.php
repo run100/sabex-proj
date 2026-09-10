@@ -8,6 +8,7 @@ use App\Services\Trades\BrainrotCatalogService;
 use App\Services\Trades\TradeListingService;
 use App\Support\TradeCanonical;
 use App\Support\TradePaths;
+use App\Support\TradeQueryRules;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -17,11 +18,9 @@ class ListingController extends Controller
 
     public function __invoke(Request $request, TradeListingService $listings, BrainrotCatalogService $catalog): View
     {
-        $wantBrainrot = $this->selectedBrainrot($catalog, $request->query('want_brainrot_id'));
-        $haveBrainrot = $this->selectedBrainrot($catalog, $request->query('have_brainrot_id'));
-        $filters = $request->only([
-            'page', 'limit', 'want_brainrot_id', 'have_brainrot_id', 'min_value', 'max_value', 'sort',
-        ]);
+        $filters = $this->validatedQuery($request, TradeQueryRules::recentListings());
+        $wantBrainrot = $this->selectedBrainrot($catalog, $filters['want_brainrot_id'] ?? null);
+        $haveBrainrot = $this->selectedBrainrot($catalog, $filters['have_brainrot_id'] ?? null);
         if ($wantBrainrot === null) {
             unset($filters['want_brainrot_id']);
         }

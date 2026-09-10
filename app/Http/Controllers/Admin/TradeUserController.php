@@ -16,7 +16,10 @@ class TradeUserController extends Controller
     {
         abort_unless(TradeSchema::ready(), 404);
 
-        $q = trim((string) $request->query('q', ''));
+        $data = $request->validate([
+            'q' => ['sometimes', 'nullable', 'string', 'max:100'],
+        ]);
+        $q = trim((string) ($data['q'] ?? ''));
 
         $users = TradeUser::query()
             ->when($q !== '', function ($query) use ($q): void {

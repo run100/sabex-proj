@@ -5,8 +5,8 @@ use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\CodesController;
 use App\Http\Controllers\Admin\ItemController;
 use App\Http\Controllers\Admin\JobController;
-use App\Http\Controllers\Admin\SiteController;
 use App\Http\Controllers\Admin\NewsController;
+use App\Http\Controllers\Admin\SiteController;
 use App\Http\Controllers\Admin\SpaController;
 use App\Http\Controllers\Admin\TradeEmailCodeController;
 use App\Http\Controllers\Admin\TradeJoinController;
@@ -50,12 +50,12 @@ Route::middleware(['admin.ip', 'admin.noindex'])->group(function (): void {
         Route::get('/api/trade-users/{tradeUser}', [TradeUserController::class, 'show']);
         Route::patch('/api/trade-users/{tradeUser}', [TradeUserController::class, 'update']);
         Route::get('/api/trade-listings', [TradeListingController::class, 'index']);
-        Route::get('/api/trade-listings/{listing}', [TradeListingController::class, 'show']);
-        Route::patch('/api/trade-listings/{listing}', [TradeListingController::class, 'update']);
+        Route::get('/api/trade-listings/{listing}', [TradeListingController::class, 'show'])->whereNumber('listing');
+        Route::patch('/api/trade-listings/{listing}', [TradeListingController::class, 'update'])->whereNumber('listing');
         Route::get('/api/trade-joins', [TradeJoinController::class, 'index']);
-        Route::delete('/api/trade-joins/{join}', [TradeJoinController::class, 'destroy']);
+        Route::delete('/api/trade-joins/{join}', [TradeJoinController::class, 'destroy'])->whereNumber('join');
         Route::get('/api/trade-reports', [TradeReportController::class, 'index']);
-        Route::patch('/api/trade-reports/{report}', [TradeReportController::class, 'update']);
+        Route::patch('/api/trade-reports/{report}', [TradeReportController::class, 'update'])->whereNumber('report');
         Route::get('/api/trade-email-codes', [TradeEmailCodeController::class, 'index']);
         Route::get('/api/access-logs', [AccessLogController::class, 'index']);
 

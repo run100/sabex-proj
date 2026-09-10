@@ -174,6 +174,7 @@ class SabCalculatorCatalogService
             'traits' => $meta['traits'],
             'streakMultipliers' => $meta['streakMultipliers'],
             'chunks' => $chunkIds,
+            'value_list_hash' => sha1($this->encode($valueList)),
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         $version = now()->format('YmdHis').'-'.substr(sha1($seed), 0, 12);
 

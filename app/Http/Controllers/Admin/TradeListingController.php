@@ -8,6 +8,7 @@ use App\Models\TradeListing;
 use App\Models\TradeListingItem;
 use App\Services\Trades\TradeListingService;
 use App\Support\TradeSchema;
+use App\Support\TradeTextPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -36,8 +37,12 @@ class TradeListingController extends Controller
     {
         abort_unless(TradeSchema::ready(), 404);
 
-        $status = trim((string) $request->query('status', ''));
-        $q = trim((string) $request->query('q', ''));
+        $data = $request->validate([
+            'status' => ['sometimes', 'nullable', 'string', Rule::in(self::STATUSES)],
+            'q' => ['sometimes', 'nullable', 'string', 'max:100'],
+        ]);
+        $status = trim((string) ($data['status'] ?? ''));
+        $q = trim((string) ($data['q'] ?? ''));
 
         $listings = TradeListing::query()
             ->with(['owner:id,username,email,profile_id,avatar_url', 'counterparty:id,username,email,profile_id'])
@@ -113,6 +118,17 @@ class TradeListingController extends Controller
             ], 422);
         }
 
+        $normalizedNote = null;
+        if (array_key_exists('note', $data)) {
+            try {
+                $normalizedNote = TradeTextPolicy::optional($data['note']);
+            } catch (TradeException $exception) {
+                return response()->json([
+                    'message' => $exception->getMessage(),
+                ], $exception->status);
+            }
+        }
+
         $dirty = false;
         if (array_key_exists('status', $data)) {
             try {
@@ -137,8 +153,7 @@ class TradeListingController extends Controller
             $dirty = true;
         }
         if (array_key_exists('note', $data)) {
-            $note = trim((string) ($data['note'] ?? ''));
-            $row->note = $note === '' ? null : $note;
+            $row->note = $normalizedNote;
             $dirty = true;
         }
         if (array_key_exists('views_count', $data)) {

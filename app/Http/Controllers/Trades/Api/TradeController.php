@@ -14,6 +14,7 @@ use App\Support\AccessLogService;
 use App\Support\TradeApi;
 use App\Support\TradePaths;
 use App\Support\TradePresenter;
+use App\Support\TradeQueryRules;
 use App\Support\TradeSchema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,9 +26,11 @@ class TradeController extends Controller
     public function index(Request $request, TradeListingService $listings): JsonResponse
     {
         $this->requireSchema();
-        $page = $listings->recent($request->only([
-            'page', 'limit', 'want_brainrot_id', 'have_brainrot_id', 'min_value', 'max_value', 'sort',
-        ]));
+        $filters = TradeApi::validated($request, TradeQueryRules::recentListings());
+        if ($filters instanceof JsonResponse) {
+            return $filters;
+        }
+        $page = $listings->recent($filters);
 
         return TradeApi::ok([
             'items' => collect($page->items())->map(fn ($row) => TradePresenter::listing($row))->all(),
@@ -39,9 +42,11 @@ class TradeController extends Controller
     public function completed(Request $request, TradeListingService $listings): JsonResponse
     {
         $this->requireSchema();
-        $page = $listings->completed($request->only([
-            'page', 'limit', 'username', 'roblox_sub', 'brainrot_id', 'sort',
-        ]));
+        $filters = TradeApi::validated($request, TradeQueryRules::completedListings());
+        if ($filters instanceof JsonResponse) {
+            return $filters;
+        }
+        $page = $listings->completed($filters);
 
         return TradeApi::ok([
             'items' => collect($page->items())->map(fn ($row) => TradePresenter::listing($row))->all(),
@@ -84,7 +89,11 @@ class TradeController extends Controller
     public function pending(Request $request, TradeListingService $listings): JsonResponse
     {
         $this->requireSchema();
-        $page = $listings->pending($request->only(['page', 'limit', 'sort']));
+        $filters = TradeApi::validated($request, TradeQueryRules::pendingListings());
+        if ($filters instanceof JsonResponse) {
+            return $filters;
+        }
+        $page = $listings->pending($filters);
 
         return TradeApi::ok([
             'items' => collect($page->items())->map(fn ($row) => TradePresenter::listing($row))->all(),
@@ -195,13 +204,17 @@ class TradeController extends Controller
     public function confirm(Request $request, string $ulid, TradeListingService $listings, TradeConfirmationService $confirmations): JsonResponse
     {
         $this->requireSchema();
+        $input = TradeApi::validated($request, TradeQueryRules::confirmation());
+        if ($input instanceof JsonResponse) {
+            return $input;
+        }
         try {
-            return $this->idempotent($request, 'trades.confirm.'.$ulid, function () use ($request, $ulid, $listings, $confirmations) {
+            return $this->idempotent($request, 'trades.confirm.'.$ulid, function () use ($input, $ulid, $listings, $confirmations) {
                 $listing = $confirmations->confirm(
                     auth('trades')->user(),
                     $listings->findPublic($ulid),
-                    (string) $request->input('confirmation'),
-                    $request->input('note')
+                    $input['confirmation'],
+                    $input['note'] ?? null
                 );
 
                 return TradeApi::ok(['trade' => TradePresenter::listing($listing)]);
@@ -214,11 +227,15 @@ class TradeController extends Controller
     public function activity(Request $request, TradeActivityService $activity): JsonResponse
     {
         $this->requireSchema();
+        $input = TradeApi::validated($request, TradeQueryRules::activity());
+        if ($input instanceof JsonResponse) {
+            return $input;
+        }
         $page = $activity->forUser(
             auth('trades')->user(),
-            (string) $request->query('status', 'all'),
-            (int) $request->query('page', 1),
-            (int) $request->query('limit', 20),
+            $input['status'] ?? 'all',
+            $input['page'] ?? 1,
+            $input['limit'] ?? 20,
         );
 
         return TradeApi::ok([

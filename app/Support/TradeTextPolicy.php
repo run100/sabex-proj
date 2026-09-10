@@ -10,7 +10,7 @@ final class TradeTextPolicy
 
     private const MARKUP_PATTERN = '/<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?\s*\/?>|<!--[\s\S]*?(?:-->|$)|<![A-Za-z][^>]*>|<\?[A-Za-z][^>]*\?>|<\/?[A-Za-z_:][A-Za-z0-9:._-]*(?:\s+[^<>]*)?$|&(?:[A-Za-z][A-Za-z0-9]+|#\d+|#x[0-9A-F]+);/i';
 
-    private const NORMAL_TEXT_PATTERN = '/\A[\p{L}\p{M}\p{N}\p{Zs}\r\n.,!?;:\'"()\-_\/，。！？；：、（）「」『』【】《》〈〉…—–·]+\z/u';
+    private const NORMAL_TEXT_PATTERN = '/\A[\p{L}\p{M}\p{N}\p{Zs}\r\n.,!?;\'"()\-_，。！？；：、（）「」『』【】《》〈〉…—–·]+\z/u';
 
     public static function required(mixed $value): string
     {

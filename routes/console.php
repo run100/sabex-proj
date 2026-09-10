@@ -2,6 +2,7 @@
 
 use App\Services\Seo\SabGeoflowFileSyncService;
 use App\Services\Seo\SabCalculatorCatalogService;
+use App\Services\Seo\SabExistCountCatalogService;
 use App\Services\Seo\SabRenderService;
 use App\Services\Seo\SabRotCalculatorSyncService;
 use App\Models\SeoSite;
@@ -95,6 +96,35 @@ Artisan::command('seo:sab-calculator-catalog', function () {
 
     return 0;
 })->purpose('Generate the local SAB calculator catalog without fetching rot.rocks');
+
+Artisan::command('seo:sab-exist-count-refresh', function () {
+    try {
+        $site = SeoSite::query()
+            ->where('slug', SabRenderService::SITE_SLUG)
+            ->firstOrFail();
+        $game = $site->games()
+            ->where('slug', App\Services\Seo\SabSiteContext::GAME_SLUG)
+            ->firstOrFail();
+        $result = app(SabExistCountCatalogService::class)->publish(
+            $game,
+            fn (string $message) => $this->line($message),
+        );
+
+        $this->info('SAB exist count catalog completed.');
+        $this->line('Rows: '.$result['rows']);
+        $this->line('Generated at: '.$result['generated_at']);
+        $this->line('Bytes: '.$result['bytes']);
+        $this->line('Path: '.$result['path']);
+        Log::info('seo.sab-exist-count-refresh', $result);
+    } catch (\Throwable $e) {
+        Log::error('seo.sab-exist-count-refresh', ['error' => $e->getMessage()]);
+        $this->error($e->getMessage());
+
+        return 1;
+    }
+
+    return 0;
+})->purpose('Generate the local SAB exist-count data without fetching rot.rocks');
 
 Artisan::command('seo:sab-price-history-backfill {--slug=* : Item slug to backfill; omit to process all eligible items} {--all : Same as omitting --slug (kept for compatibility)} {--sleep-ms=150 : Milliseconds to wait after each price-history API request} {--limit=0 : Process only the first N slugs (0 = no limit)}', function () {
     $service = app(SabRotCalculatorSyncService::class);
