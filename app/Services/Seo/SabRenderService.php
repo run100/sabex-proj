@@ -4724,6 +4724,9 @@ class SabRenderService
         $lastUpdate = $this->calculatorLastUpdatePayload($locale);
         $calculatorMessages = $this->calculatorCopy($locale);
         $productUrlPrefix = $this->productUrlPrefix($urlPrefix);
+        $valueListDataUrl = is_array($catalogData) && isset($catalogData['url'])
+            ? (string) $catalogData['url']
+            : data_get(SabCalculatorCatalogService::readManifest() ?? [], 'value_list');
         if ($catalogData !== null) {
             $today = is_array($catalogData['today'] ?? null) ? $catalogData['today'] : [];
             $todayTopGainer = $this->enrichValueChangeRows(
@@ -4757,7 +4760,7 @@ class SabRenderService
             'listRows'       => $ssrValueListRows,
             'listPerPage'    => self::VALUE_LIST_PER_PAGE,
             'listStatTotal'  => $catalogData !== null ? count($listRows) : $filtered->count(),
-            'valueListDataUrl' => data_get(SabCalculatorCatalogService::readManifest() ?? [], 'value_list'),
+            'valueListDataUrl' => $valueListDataUrl,
             'valueListFaqItems' => $faqItems,
             'lastUpdateLabel' => (string) ($calculatorMessages['last_update_label'] ?? 'Last update'),
             'valueTrendsLabel' => (string) ($calculatorMessages['value_trends_label'] ?? 'View Daily Value Trends'),

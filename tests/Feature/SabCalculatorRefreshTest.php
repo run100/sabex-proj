@@ -212,6 +212,10 @@ class SabCalculatorRefreshTest extends TestCase
         $this->assertFileExists($valueListPath);
         $valueList = json_decode((string) File::get($valueListPath), true);
         $this->assertCount(2, $valueList['rows'] ?? []);
+        $this->assertSame($manifest['version'], $bootstrap['version'] ?? null);
+        $this->assertSame($manifest['version'], $valueList['version'] ?? null);
+        $chunk = json_decode((string) File::get(SabCalculatorCatalogService::releaseChunkPath((string) ($manifest['version'] ?? ''), '00')), true);
+        $this->assertSame($manifest['version'], $chunk['version'] ?? null);
 
         $valueListResponse = $this->get('http://www.sabex.lab/sab-value-list');
         $valueListResponse->assertOk()
@@ -362,6 +366,7 @@ class SabCalculatorRefreshTest extends TestCase
         $this->assertSame(2, data_get($manifest, 'counts.mutations'));
         $this->assertCount(1, $manifest['chunks'] ?? []);
         $this->assertFileExists(SabCalculatorCatalogService::releaseBootstrapPath($firstVersion));
+        $this->assertFileExists(SabCalculatorCatalogService::releasePath($firstVersion).'/value-list.json');
         $this->assertSame($historyBefore, File::get($historyPath));
         $this->assertSame($currentValuesBefore, SeoItemCurrentValue::query()->orderBy('id')->pluck('value_normalized')->all());
         $this->assertSame($observationsBefore, SeoItemObservation::query()->count());
@@ -371,6 +376,7 @@ class SabCalculatorRefreshTest extends TestCase
         $secondManifest = json_decode((string) File::get(SabCalculatorCatalogService::manifestPath()), true);
         $this->assertNotSame($firstVersion, (string) ($secondManifest['version'] ?? ''));
         $this->assertFileExists(SabCalculatorCatalogService::releaseBootstrapPath((string) ($secondManifest['version'] ?? '')));
+        $this->assertFileExists(SabCalculatorCatalogService::releasePath((string) ($secondManifest['version'] ?? '')).'/value-list.json');
         $this->assertFileExists(SabCalculatorCatalogService::releaseBootstrapPath($firstVersion));
     }
 

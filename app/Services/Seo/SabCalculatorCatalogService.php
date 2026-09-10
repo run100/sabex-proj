@@ -460,21 +460,31 @@ class SabCalculatorCatalogService
     }
 
     /**
-     * @return array{rows: list<array<string, mixed>>, today: array<string, mixed>}|null
+     * @return array{version: string, url: string, rows: list<array<string, mixed>>, today: array<string, mixed>}|null
      */
     public static function readValueList(): ?array
     {
-        $path = self::currentValueListPath();
-        if ($path === null) {
+        $manifest = self::readManifest();
+        $version = trim((string) ($manifest['version'] ?? ''));
+        if ($version === '') {
+            return null;
+        }
+
+        $path = self::releasePath($version).'/value-list.json';
+        if (! is_file($path)) {
             return null;
         }
 
         $data = json_decode((string) File::get($path), true);
-        if (! is_array($data) || ! is_array($data['rows'] ?? null)) {
+        if (! is_array($data)
+            || (string) ($data['version'] ?? '') !== $version
+            || ! is_array($data['rows'] ?? null)) {
             return null;
         }
 
         return [
+            'version' => $version,
+            'url' => (string) ($manifest['value_list'] ?? self::PUBLIC_BASE_PATH.'/releases/'.$version.'/value-list.json'),
             'rows' => array_values($data['rows']),
             'today' => is_array($data['today'] ?? null) ? $data['today'] : [],
         ];
