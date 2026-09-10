@@ -216,7 +216,8 @@ php83 scripts/export-sab-to-mysql.php
 | `resources/seo/sab/codes.json`（及 `codes-i18n*.json`） | codes 页 |
 | `storage/app/seo/sab-i18n.json` | 站点文案翻译 |
 | `storage/app/seo/sab-exist-count-gallery.json` | gallery |
-| `storage/app/seo/sab-calculator-meta.json` | 计算器 meta |
+| `storage/app/calc/sab/meta.json` | 计算器 meta |
+| `storage/app/calc/sab/catalog/` | 计算器 Catalog manifest、完整索引与分片 |
 | `storage/app/seo/sab-price-history/{slug}.json` | 现 561 个文件（新商品可能还没有；商品页读不到也不 500） |
 | `resources/seo/sab/rebirths.json` | Wiki rebirth 指南 |
 
@@ -231,9 +232,17 @@ php83 artisan seo:sab-calculator-refresh
 
 `bootstrap/app.php` 默认每天 `04:30`。`SAB_CALCULATOR_SYNC_ENABLED` / `SAB_CALCULATOR_SYNC_AT`。本机页面：`http://www.sabex.lab:7510/steal-a-brainrot-trading-calculator`。
 
-打 rot.rocks 的 brainrots / mutations / traits，在本站 upsert 商品、变体、`seo_item_current_values`；远程新 slug **直接建商品**（`is_listed=true`，`is_publish_html=false`）。12h 相同 hash 不重复插观测。按 slug 合并当天点到本站 `{slug}.json`（不删历史点）。重写 `sab-calculator-meta.json`（traits / mutations / streak / `synced_at`，页头 Last update 读这个）。计算器图已在 `public/uploads/images/sab/calculator/` 则复用（本机这个目录若仍是 GEOFlow symlink，只读不写）。缺图下载到本站 `public/uploads/images/sab-calculator/`。不写 GEOFlow，也不生成静态 HTML。
+打 rot.rocks 的 brainrots / mutations / traits，在本站 upsert 商品、变体、`seo_item_current_values`；远程新 slug **直接建商品**（`is_listed=true`，`is_publish_html=false`）。12h 相同 hash 不重复插观测。按 slug 合并当天点到本站 `{slug}.json`（不删历史点）。重写 `storage/app/calc/sab/meta.json`，并生成版本化 Catalog（完整索引由浏览器加载，mutation 详情按分片加载）。计算器图已在 `public/uploads/images/sab/calculator/` 则复用（本机这个目录若仍是 GEOFlow symlink，只读不写）。缺图下载到本站 `public/uploads/images/sab-calculator/`。不写 GEOFlow，也不生成静态 HTML。
 
 新闻 / wiki / exist count / codes 仍可走下面第 3 步，和这条命令无关。
+
+如果只需要根据本站已有数据库重新生成计算器 Catalog，不访问 rot.rocks：
+
+```bash
+php83 artisan seo:sab-calculator-catalog
+```
+
+这个命令只读取本站商品、变体、当前值和 `storage/app/calc/sab/meta.json`，生成 manifest、完整物品索引和 mutation 分片。`seo:sab-calculator-refresh` 保留兼容行为，完成 rot.rocks 同步后仍会自动生成一次 Catalog。
 
 ### 3. 再把 GEOFlow 最新业务数据同步过来（已按 upsert 做）
 
@@ -244,7 +253,7 @@ export 已是按主键 upsert。需要时再跑同一脚本即可（先 `--dry-r
 - `seo_news_articles` / `seo_value_sources` / aliases / translations
 - **不要**导出或覆盖 `seo_item_observations`
 - **不要**重写 `sab-price-history/`
-- checksum 不同才覆盖 `codes.json`、`sab-i18n.json`、gallery；`rebirths.json` 已在本站。`sab-calculator-meta.json` 由本站日更写，不要用 GEOFlow 覆盖
+- checksum 不同才覆盖 `codes.json`、`sab-i18n.json`、gallery；`rebirths.json` 已在本站。计算器 meta 和 Catalog 由本站日更写，不要用 GEOFlow 覆盖
 - 商品图目录是指向 GEOFlow 同名目录的 symlink，新图自动可见，不删旧图
 
 对照：`http://127.0.0.1:8083/seo/sab/preview/wiki` 与各子页；抽旧商品 + 新商品的 exist/当前价、`/news` 条数、codes；30D 图仍读本站 JSON。本机 7310 若没起来，用实际入口 `http://127.0.0.1:7510/`。
@@ -257,6 +266,7 @@ export 已是按主键 upsert。需要时再跑同一脚本即可（先 `--dry-r
 - 格式：`{"slug","variants":{"1001":[{"date","value"}]}}`
 - 商品页展示截近 30 天；文件里的点不裁，留给以后 1Y
 - 日更只写 **本站** 这些 JSON，不再写 GEOFlow
+- 历史点补全（无参全量、实时日志、分批 SQL）见 [sab-price-history-backfill.md](sab-price-history-backfill.md)
 
 ## 日更
 
@@ -264,7 +274,7 @@ export 已是按主键 upsert。需要时再跑同一脚本即可（先 `--dry-r
 
 调度在 `bootstrap/app.php`，默认 `04:30`。环境变量：`SAB_CALCULATOR_SYNC_ENABLED`、`SAB_CALCULATOR_SYNC_AT`。
 
-行为：打 rot.rocks，upsert 本站商品 / 变体 / 当前价 / traits；远程新品直接建（不发布 SEO 商品页）；12h 相同 hash 不重复插观测；按 slug 合并当天点到本站 `{slug}.json`；重写 calculator meta 的 `synced_at`。动态页直接读库，不再 `seo:sab-render`。
+行为：打 rot.rocks，upsert 本站商品 / 变体 / 当前价 / traits；远程新品直接建（不发布 SEO 商品页）；12h 相同 hash 不重复插观测；按 slug 合并当天点到本站 `{slug}.json`；写 `storage/app/calc/sab/meta.json` 和版本化 Catalog。动态页只加载轻量页面上下文，浏览器通过公开 JSON 路由加载完整物品索引，不再 `seo:sab-render`。
 
 GEOFlow 的同名命令（preview → 有变化才 sync → render）**不再作为本站日更入口**。
 
@@ -280,7 +290,7 @@ GEOFlow 的同名命令（preview → 有变化才 sync → render）**不再作
 
 日常数据流：
 
-1. sabex 每天跑 `seo:sab-calculator-refresh`，自己打 rot.rocks 更新当前价、traits、新品和 `{slug}.json`
+1. sabex 每天跑 `seo:sab-calculator-refresh`，自己打 rot.rocks 更新当前价、traits、新品、`{slug}.json` 和 Catalog
 2. GEOFlow 继续采集 / 人工改新闻、wiki、exist count、codes
 3. 需要时再跑 upsert 版 export，把新闻 / wiki / exist / codes 同步到 sabex（不要覆盖观测和价格 JSON；calculator-meta 以本站日更为准）
 

@@ -9,6 +9,7 @@ use App\Models\SeoItemObservation;
 use App\Models\SeoItemVariant;
 use App\Models\SeoSite;
 use App\Models\SeoValueSource;
+use App\Services\Seo\SabCalculatorCatalogService;
 use App\Services\Seo\SabRenderService;
 use App\Services\Seo\SabRotCalculatorSyncService;
 use Illuminate\Database\Schema\Blueprint;
@@ -24,12 +25,14 @@ class SabCalculatorRefreshTest extends TestCase
     {
         parent::setUp();
         $this->createSeoTables();
+        File::ensureDirectoryExists(dirname(SabRotCalculatorSyncService::calculatorMetaPath()));
         File::delete(SabRotCalculatorSyncService::calculatorMetaPath());
     }
 
     protected function tearDown(): void
     {
         File::delete(SabRotCalculatorSyncService::calculatorMetaPath());
+        File::deleteDirectory(SabCalculatorCatalogService::rootPath());
         File::delete(storage_path('app/seo/sab-price-history/refresh-test-brainrot.json'));
         File::delete(storage_path('app/seo/sab-price-history/brand-new-brainrot.json'));
         parent::tearDown();
@@ -194,6 +197,28 @@ class SabCalculatorRefreshTest extends TestCase
         $this->assertSame(['3' => 2, '6' => 4], data_get($site->fresh()->settings_json, 'sab_calculator.streak_multipliers'));
         $this->assertSame('2026-01-01T00:00:00+00:00', data_get($item->fresh()->attributes_json, 'rot_rocks.first_seen_at'));
 
+        $manifest = json_decode((string) File::get(SabCalculatorCatalogService::manifestPath()), true);
+        $this->assertSame(2, data_get($manifest, 'counts.items'));
+        $this->assertSame(3, data_get($manifest, 'counts.mutations'));
+        $this->assertNotEmpty($manifest['bootstrap'] ?? null);
+        $this->assertCount(1, $manifest['chunks'] ?? []);
+        $bootstrapPath = SabCalculatorCatalogService::releaseBootstrapPath((string) ($manifest['version'] ?? ''));
+        $this->assertFileExists($bootstrapPath);
+        $bootstrap = json_decode((string) File::get($bootstrapPath), true);
+        $this->assertCount(2, $bootstrap['items'] ?? []);
+
+        $manifestResponse = $this->get('http://www.sabex.lab/data/calc/sab/manifest.json');
+        $manifestResponse->assertOk()
+            ->assertHeader('Content-Type', 'application/json; charset=UTF-8');
+        $this->assertStringContainsString('max-age=60', (string) $manifestResponse->headers->get('Cache-Control'));
+        $this->assertStringContainsString('public', (string) $manifestResponse->headers->get('Cache-Control'));
+
+        $bootstrapResponse = $this->get('http://www.sabex.lab/data/calc/sab/releases/'.$manifest['version'].'/bootstrap.json');
+        $bootstrapResponse->assertOk()
+            ->assertHeader('Content-Type', 'application/json; charset=UTF-8');
+        $this->assertStringContainsString('max-age=31536000', (string) $bootstrapResponse->headers->get('Cache-Control'));
+        $this->assertStringContainsString('immutable', (string) $bootstrapResponse->headers->get('Cache-Control'));
+
         $firstSyncedAt = $meta['synced_at'];
         $this->travel(2)->seconds();
         $this->artisan('seo:sab-calculator-refresh')
@@ -219,6 +244,118 @@ class SabCalculatorRefreshTest extends TestCase
         $this->assertSame(0, $exitCode);
         $this->assertStringContainsString('seo:sab-calculator-refresh', $output);
         $this->assertMatchesRegularExpression('/30\s+4\s+\*\s+\*\s+\*/', $output);
+    }
+
+    public function test_catalog_command_uses_local_data_without_remote_or_sync_side_effects(): void
+    {
+        $site = SeoSite::query()->create([
+            'slug' => SabRenderService::SITE_SLUG,
+            'name' => 'SAB',
+            'settings_json' => [],
+        ]);
+        $game = SeoGame::query()->create([
+            'seo_site_id' => $site->id,
+            'slug' => 'steal-a-brainrot',
+            'name' => 'Steal a Brainrot',
+        ]);
+        $source = SeoValueSource::query()->create([
+            'slug' => SabRotCalculatorSyncService::SOURCE_SLUG,
+            'name' => 'Rot Rocks Calculator',
+            'url' => 'https://rot.rocks/trading/calculator',
+            'parser_type' => 'json_api',
+            'priority' => 80,
+            'is_primary_source' => false,
+            'enabled' => true,
+        ]);
+        $item = SeoItem::query()->create([
+            'seo_game_id' => $game->id,
+            'slug' => 'local-catalog-item',
+            'name' => 'Local Catalog Item',
+            'rarity' => 'Secret',
+            'is_listed' => true,
+            'is_publish_html' => true,
+            'avg_coins_raw' => '100',
+            'attributes_json' => [
+                'rot_rocks' => [
+                    'name' => 'Local Catalog Item',
+                    'base_income' => 100,
+                    'robux_value' => 100,
+                    'rarity' => 'Secret',
+                    'demand' => 'HIGH',
+                    'first_seen_at' => '2026-01-01T00:00:00+00:00',
+                ],
+            ],
+        ]);
+        $base = SeoItemVariant::query()->create([
+            'seo_item_id' => $item->id,
+            'variant_key' => 'base',
+            'variant_name' => 'Base',
+            'variant_type' => 'base',
+            'multiplier' => 1,
+        ]);
+        $mutation = SeoItemVariant::query()->create([
+            'seo_item_id' => $item->id,
+            'variant_key' => 'mutation-rainbow',
+            'variant_name' => 'Rainbow',
+            'variant_type' => 'mutation',
+            'mutation_name' => 'Rainbow',
+            'multiplier' => 10,
+            'attributes_json' => ['rot_id' => 'mutation-rainbow', 'demand' => 'HIGH'],
+        ]);
+        foreach ([[$base, 100], [$mutation, 1000]] as [$variant, $value]) {
+            SeoItemCurrentValue::query()->create([
+                'seo_item_variant_id' => $variant->id,
+                'seo_value_source_id' => $source->id,
+                'collected_at' => now(),
+                'changed_at' => now(),
+                'value_raw' => (string) $value,
+                'value_normalized' => $value,
+                'currency' => 'ROBUX',
+                'demand' => 'HIGH',
+            ]);
+        }
+        File::put(SabRotCalculatorSyncService::calculatorMetaPath(), json_encode([
+            'synced_at' => '2026-09-03T00:00:00+00:00',
+            'traits' => [[
+                'id' => 'local-trait',
+                'name' => 'Local Trait',
+                'multiplier' => 2,
+                'valueMultiplier' => 1.2,
+                'image' => null,
+            ]],
+            'mutations' => [],
+            'streakMultipliers' => ['3' => 2, '6' => 3],
+        ], JSON_UNESCAPED_SLASHES));
+
+        $historyPath = storage_path('app/seo/sab-price-history/local-catalog-item.json');
+        File::ensureDirectoryExists(dirname($historyPath));
+        File::put($historyPath, '{"slug":"local-catalog-item","variants":{"'.$base->id.'":[{"date":"2026-09-03","value":100}]}}');
+        $historyBefore = File::get($historyPath);
+        $currentValuesBefore = SeoItemCurrentValue::query()->orderBy('id')->pluck('value_normalized')->all();
+        $observationsBefore = SeoItemObservation::query()->count();
+
+        Http::preventStrayRequests();
+        $this->artisan('seo:sab-calculator-catalog')
+            ->expectsOutput('SAB calculator catalog completed.')
+            ->expectsOutputToContain('Catalog: version=')
+            ->assertSuccessful();
+
+        $manifest = json_decode((string) File::get(SabCalculatorCatalogService::manifestPath()), true);
+        $firstVersion = (string) ($manifest['version'] ?? '');
+        $this->assertSame(1, data_get($manifest, 'counts.items'));
+        $this->assertSame(2, data_get($manifest, 'counts.mutations'));
+        $this->assertCount(1, $manifest['chunks'] ?? []);
+        $this->assertFileExists(SabCalculatorCatalogService::releaseBootstrapPath($firstVersion));
+        $this->assertSame($historyBefore, File::get($historyPath));
+        $this->assertSame($currentValuesBefore, SeoItemCurrentValue::query()->orderBy('id')->pluck('value_normalized')->all());
+        $this->assertSame($observationsBefore, SeoItemObservation::query()->count());
+
+        $this->travel(2)->seconds();
+        $this->artisan('seo:sab-calculator-catalog')->assertSuccessful();
+        $secondManifest = json_decode((string) File::get(SabCalculatorCatalogService::manifestPath()), true);
+        $this->assertNotSame($firstVersion, (string) ($secondManifest['version'] ?? ''));
+        $this->assertFileExists(SabCalculatorCatalogService::releaseBootstrapPath((string) ($secondManifest['version'] ?? '')));
+        $this->assertFileExists(SabCalculatorCatalogService::releaseBootstrapPath($firstVersion));
     }
 
     private function createSeoTables(): void

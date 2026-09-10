@@ -64,7 +64,6 @@ class SabGeoflowFileSyncService
             $backend.'/resources/seo/sab/codes-i18n-west.json' => resource_path('seo/sab/codes-i18n-west.json'),
             $backend.'/storage/app/seo/sab-i18n.json' => storage_path('app/seo/sab-i18n.json'),
             $backend.'/storage/app/seo/sab-exist-count-gallery.json' => storage_path('app/seo/sab-exist-count-gallery.json'),
-            $backend.'/storage/app/seo/sab-calculator-meta.json' => storage_path('app/seo/sab-calculator-meta.json'),
         ];
     }
 

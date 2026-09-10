@@ -5,6 +5,7 @@ namespace App\Services\Trades;
 use App\Exceptions\TradeException;
 use App\Models\SeoItem;
 use App\Models\SeoItemVariant;
+use App\Services\Seo\SabCalculatorCatalogService;
 use App\Services\Seo\SabRotCalculatorSyncService;
 use Illuminate\Support\Collection;
 
@@ -310,7 +311,7 @@ class BrainrotCatalogService
      */
     private function calculatorMeta(): array
     {
-        $path = SabRotCalculatorSyncService::calculatorMetaPath();
+        $path = SabCalculatorCatalogService::metaReadPath();
         if (! is_file($path)) {
             return ['traits' => [], 'streakMultipliers' => ['3' => 2, '6' => 3]];
         }

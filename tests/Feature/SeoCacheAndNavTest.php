@@ -341,5 +341,7 @@ class SeoCacheAndNavTest extends TestCase
         $config = json_decode($match[1], true);
         $this->assertIsArray($config);
         $this->assertSame('', $config['csrf'] ?? null);
+        $this->assertNull($config['data'] ?? null);
+        $this->assertSame('/data/calc/sab/manifest.json', $config['catalogManifestUrl'] ?? null);
     }
 }

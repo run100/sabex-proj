@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Seo\SabCalculatorCatalogController;
 use App\Http\Controllers\Seo\SabPublicController;
 use App\Services\Seo\SabRenderService;
 use App\Services\Seo\SabWikiPageDefinitions;
@@ -16,6 +17,14 @@ if ($consolePath !== '') {
 }
 
 Route::get('/products/{slug}/price-history.json', [SabPublicController::class, 'itemPriceHistory']);
+Route::get('/data/calc/sab/manifest.json', [SabCalculatorCatalogController::class, 'manifest']);
+Route::get('/data/calc/sab/releases/{version}/bootstrap.json', [SabCalculatorCatalogController::class, 'bootstrap'])
+    ->where('version', '[a-z0-9][a-z0-9-]*');
+Route::get('/data/calc/sab/releases/{version}/chunks/{chunk}.json', [SabCalculatorCatalogController::class, 'chunk'])
+    ->where([
+        'version' => '[a-z0-9][a-z0-9-]*',
+        'chunk' => '[0-9]{2}',
+    ]);
 
 Route::middleware('cache.public.seo')->group(function () use ($localePattern): void {
     Route::get('/robots.txt', [SabPublicController::class, 'robots']);

@@ -3492,22 +3492,39 @@ class SabRenderService
         return $rows;
     }
 
-    public function calculatorViewContext(string $locale = self::DEFAULT_LOCALE, string $siteSlug = self::SITE_SLUG): array
+    public function calculatorViewContext(
+        string $locale = self::DEFAULT_LOCALE,
+        string $siteSlug = self::SITE_SLUG,
+        bool $includeTodaySummary = true,
+    ): array
     {
         $locale = self::normalizeLocale($locale);
         $ctx = new SabSiteContext($siteSlug);
         $site = $ctx->resolve();
-        $game = $ctx->dataGame($site);
         $defaultBase = $ctx->isCalculatorOnly($site) ? 'https://sabcalculator.com' : 'https://sabexistcount.com';
         $baseUrl = rtrim($site->base_url ?: $defaultBase, '/');
-        $items = $this->loadItems($game);
         $i18n = $this->loadI18n($site);
         $t = $this->mergeSabTranslations($locale, $i18n);
         $urlPrefix = $ctx->isCalculatorOnly($site)
             ? $ctx->previewUrlPrefix()
             : self::localizedPreviewPath($locale);
 
-        return $this->calculatorViewPayload($urlPrefix, $locale, $baseUrl, $t, $items, $ctx->cssHrefForRender(), $site, $ctx);
+        return $this->calculatorViewPayload(
+            $urlPrefix,
+            $locale,
+            $baseUrl,
+            $t,
+            null,
+            $ctx->cssHrefForRender(),
+            $site,
+            $ctx,
+            $includeTodaySummary,
+        );
+    }
+
+    public function tradeBuilderViewContext(string $locale = self::DEFAULT_LOCALE): array
+    {
+        return $this->calculatorViewContext($locale, self::SITE_SLUG, false);
     }
 
     /**
@@ -5335,7 +5352,17 @@ class SabRenderService
     /**
      * @return array<string, mixed>
      */
-    private function calculatorViewPayload(string $urlPrefix, string $locale, string $baseUrl, array $t, Collection $allItems, string $cssHref, ?SeoSite $site = null, ?SabSiteContext $ctx = null): array
+    private function calculatorViewPayload(
+        string $urlPrefix,
+        string $locale,
+        string $baseUrl,
+        array $t,
+        ?Collection $allItems,
+        string $cssHref,
+        ?SeoSite $site = null,
+        ?SabSiteContext $ctx = null,
+        bool $includeTodaySummary = true,
+    ): array
     {
         $ctx ??= new SabSiteContext($site?->slug ?? self::SITE_SLUG);
         $site ??= $ctx->resolve();
@@ -5364,7 +5391,7 @@ class SabRenderService
         $faqHref = $isCalculatorOnly ? self::calculatorStaticPageHref($urlPrefix, 'faq') : null;
         $todayTopGainers = [];
         $todayTopLosers = [];
-        if (! $isCalculatorOnly) {
+        if (! $isCalculatorOnly && $includeTodaySummary) {
             [$todayTopGainers, $todayTopLosers] = app(SabValueChangesService::class)
                 ->topMoverSummaries(1, 5);
             $todayTopGainers = $this->enrichValueChangeRows($todayTopGainers, $productUrlPrefix);
@@ -5408,8 +5435,13 @@ class SabRenderService
             'calculatorLastUpdatedLabel' => $lastUpdate['label'],
             'siteSlug' => $ctx->siteSlug(),
             'brand' => $brand,
-            'calculatorData' => $this->calculatorData($allItems, $site),
-            'popularTradeItems' => $this->popularTradeItems($allItems),
+            'calculatorData' => $allItems !== null ? $this->calculatorData($allItems, $site) : null,
+            'calculatorCatalogManifestUrl' => SabCalculatorCatalogService::publicManifestUrl(),
+            'popularTradeItems' => $allItems !== null
+                ? $this->popularTradeItems($allItems)
+                : ($isCalculatorOnly || ! $includeTodaySummary
+                    ? collect()
+                    : $this->popularTradeItemsFromDatabase($ctx, $site)),
             'calculatorFaqItems' => $faqItems,
             'websiteJsonLd' => $this->websiteJsonLd($baseUrl, $seoDescription),
             'jsonLd' => $this->calculatorPageJsonLd($seoTitle, $seoDescription, $pageUrl, $locale, $faqItems),
@@ -5422,7 +5454,7 @@ class SabRenderService
      */
     private function calculatorLastUpdatePayload(string $locale): array
     {
-        $path = SabRotCalculatorSyncService::calculatorMetaPath();
+        $path = SabCalculatorCatalogService::metaReadPath();
         if (! is_readable($path)) {
             return ['at' => null, 'label' => null];
         }
@@ -5621,6 +5653,27 @@ class SabRenderService
         return $items
             ->filter(fn (SeoItem $item) => in_array($item->slug, $preferred, true))
             ->sortBy(fn (SeoItem $item) => array_search($item->slug, $preferred, true))
+            ->values();
+    }
+
+    private function popularTradeItemsFromDatabase(SabSiteContext $ctx, SeoSite $site): Collection
+    {
+        $preferred = [
+            'strawberry-elephant',
+            'dragon-cannelloni',
+            'headless-horseman',
+            'garama-and-madundung',
+        ];
+        $game = $ctx->dataGame($site);
+        $items = SeoItem::query()
+            ->where('seo_game_id', $game->id)
+            ->whereIn('slug', $preferred)
+            ->get(['id', 'slug', 'name', 'display_name', 'is_publish_html']);
+
+        return collect($preferred)
+            ->map(fn (string $slug) => $items->firstWhere('slug', $slug))
+            ->filter(fn ($item): bool => $item instanceof SeoItem)
+            ->filter(fn (SeoItem $item): bool => self::shouldLinkProduct($item))
             ->values();
     }
 
@@ -6985,7 +7038,7 @@ class SabRenderService
     private function loadItems(SeoGame $game): Collection
     {
         // Only load base and mutation variants; trait variants are global and
-        // live in sab-calculator-meta.json (not duplicated per item in DB).
+        // live in storage/app/calc/sab/meta.json (not duplicated per item in DB).
         $items = SeoItem::query()
             ->where('seo_game_id', $game->id)
             ->with([
@@ -7005,7 +7058,7 @@ class SabRenderService
      */
     private function loadCalculatorMeta(): array
     {
-        $path = SabRotCalculatorSyncService::calculatorMetaPath();
+        $path = SabCalculatorCatalogService::metaReadPath();
         if (! is_file($path)) {
             return ['traits' => [], 'mutations' => [], 'streakMultipliers' => ['3' => 2, '6' => 3]];
         }

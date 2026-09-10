@@ -1,7 +1,10 @@
 <?php
 
 use App\Services\Seo\SabGeoflowFileSyncService;
+use App\Services\Seo\SabCalculatorCatalogService;
+use App\Services\Seo\SabRenderService;
 use App\Services\Seo\SabRotCalculatorSyncService;
+use App\Models\SeoSite;
 use App\Services\Trades\TradeListingService;
 use App\Support\TradeSchema;
 use Illuminate\Foundation\Inspiring;
@@ -44,6 +47,12 @@ Artisan::command('seo:sab-calculator-refresh', function () {
         $this->line('Traits: '.$result['traits'].' new='.$result['new_traits']);
         $this->line('Images downloaded: '.$result['images_downloaded']);
         $this->line('Meta: '.$result['meta_path']);
+        $this->line('Catalog: version='.$result['catalog_version']
+            .' items='.$result['catalog_items']
+            .' mutations='.$result['catalog_mutations']
+            .' chunks='.$result['catalog_chunks']
+            .' bytes='.$result['catalog_bytes']);
+        $this->line('Catalog manifest: '.$result['catalog_manifest_path']);
         Log::info('seo.sab-calculator-refresh', $result);
     } catch (\Throwable $e) {
         Log::error('seo.sab-calculator-refresh', ['error' => $e->getMessage()]);
@@ -54,6 +63,36 @@ Artisan::command('seo:sab-calculator-refresh', function () {
 
     return 0;
 })->purpose('Fetch rot.rocks catalog and prices, upsert local calculator data, and refresh Last update');
+
+Artisan::command('seo:sab-calculator-catalog', function () {
+    try {
+        $site = SeoSite::query()
+            ->where('slug', SabRenderService::SITE_SLUG)
+            ->firstOrFail();
+        $result = app(SabCalculatorCatalogService::class)->publish(
+            $site,
+            null,
+            null,
+            fn (string $message) => $this->line($message),
+        );
+
+        $this->info('SAB calculator catalog completed.');
+        $this->line('Catalog: version='.$result['version']
+            .' items='.$result['items']
+            .' mutations='.$result['mutations']
+            .' chunks='.$result['chunks']
+            .' bytes='.$result['bytes']);
+        $this->line('Catalog manifest: '.$result['manifest_path']);
+        Log::info('seo.sab-calculator-catalog', $result);
+    } catch (\Throwable $e) {
+        Log::error('seo.sab-calculator-catalog', ['error' => $e->getMessage()]);
+        $this->error($e->getMessage());
+
+        return 1;
+    }
+
+    return 0;
+})->purpose('Generate the local SAB calculator catalog without fetching rot.rocks');
 
 Artisan::command('seo:sab-price-history-backfill {--slug=* : Item slug to backfill; omit to process all eligible items} {--all : Same as omitting --slug (kept for compatibility)} {--sleep-ms=150 : Milliseconds to wait after each price-history API request} {--limit=0 : Process only the first N slugs (0 = no limit)}', function () {
     $service = app(SabRotCalculatorSyncService::class);

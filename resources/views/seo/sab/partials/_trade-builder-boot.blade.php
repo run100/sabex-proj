@@ -1,6 +1,7 @@
 @php
   $builderConfig = [
-      'data' => $calculatorData ?? ['brainrots' => [], 'traits' => [], 'streakMultipliers' => []],
+      'data' => $calculatorData ?? null,
+      'catalogManifestUrl' => $calculatorCatalogManifestUrl ?? \App\Services\Seo\SabCalculatorCatalogService::publicManifestUrl(),
       'ui' => $calculatorUi ?? $calcUi ?? [],
       'rarityAll' => $t['rarity_filter_all'] ?? 'All',
       'publishUrl' => $tradePublishUrl ?? '/api/v1/trading/trades',

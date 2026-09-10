@@ -25,8 +25,6 @@ class SabRotCalculatorSyncService
 
     private const BASE_URL = 'https://rot.rocks';
 
-    private const META_PATH = 'app/seo/sab-calculator-meta.json';
-
     private const BACKFILL_CHUNK_SIZE = 50;
 
     private ?int $nextObservationId = null;
@@ -46,11 +44,7 @@ class SabRotCalculatorSyncService
 
     public static function calculatorMetaPath(): string
     {
-        if (app()->environment('testing')) {
-            return storage_path('framework/testing/sab-calculator-meta.json');
-        }
-
-        return storage_path(self::META_PATH);
+        return SabCalculatorCatalogService::metaPath();
     }
 
     /**
@@ -76,7 +70,13 @@ class SabRotCalculatorSyncService
      *     remote_traits: int,
      *     synced_at: string,
      *     duration_ms: int,
-     *     meta_path: string
+     *     meta_path: string,
+     *     catalog_version: string,
+     *     catalog_manifest_path: string,
+     *     catalog_items: int,
+     *     catalog_mutations: int,
+     *     catalog_chunks: int,
+     *     catalog_bytes: int
      * }
      */
     public function refresh(?callable $onProgress = null): array
@@ -234,6 +234,19 @@ class SabRotCalculatorSyncService
         $this->saveCalculatorMeta($traits, $mutations, $streakMultipliers, $syncedAt);
         $this->reportProgress('Meta written: '.self::calculatorMetaPath());
         $this->storeStreakMultipliers($site, $streakMultipliers);
+        $this->reportProgress('Publishing calculator catalog...');
+        $catalog = app(SabCalculatorCatalogService::class)->publish(
+            $site,
+            $game,
+            $syncedAt,
+            fn (string $message) => $this->reportProgress($message),
+        );
+        $this->reportProgress(
+            'Catalog published: version='.$catalog['version']
+            .' items='.$catalog['items']
+            .' mutations='.$catalog['mutations']
+            .' chunks='.$catalog['chunks']
+        );
         foreach ($traits as $trait) {
             $slug = Str::slug((string) $trait['name']);
             if (! isset($previousTraitSlugs[$slug])) {
@@ -244,6 +257,12 @@ class SabRotCalculatorSyncService
         $counts['synced_at'] = $syncedAt;
         $counts['duration_ms'] = (int) round((microtime(true) - $startedAt) * 1000);
         $counts['meta_path'] = self::calculatorMetaPath();
+        $counts['catalog_version'] = $catalog['version'];
+        $counts['catalog_manifest_path'] = $catalog['manifest_path'];
+        $counts['catalog_items'] = $catalog['items'];
+        $counts['catalog_mutations'] = $catalog['mutations'];
+        $counts['catalog_chunks'] = $catalog['chunks'];
+        $counts['catalog_bytes'] = $catalog['bytes'];
 
         return $counts;
     }
@@ -435,7 +454,7 @@ class SabRotCalculatorSyncService
     }
 
     /**
-     * Save global traits/mutations definitions to sab-calculator-meta.json.
+     * Save global traits/mutations definitions to the calculator data root.
      *
      * @param  list<array<string, mixed>>  $traits
      * @param  list<array<string, mixed>>  $mutations
@@ -472,7 +491,7 @@ class SabRotCalculatorSyncService
             ];
         }
 
-        $path = self::calculatorMetaPath();
+        $path = SabCalculatorCatalogService::metaPath();
         if (! is_dir(dirname($path))) {
             mkdir(dirname($path), 0755, true);
         }
@@ -848,7 +867,7 @@ class SabRotCalculatorSyncService
      */
     private function previousMetaTraitSlugs(): array
     {
-        $path = self::calculatorMetaPath();
+        $path = SabCalculatorCatalogService::metaReadPath();
         if (! is_readable($path)) {
             return [];
         }

@@ -1,4 +1,4 @@
-(() => {
+(async () => {
   const configEl = document.getElementById('sab-trade-builder-config');
   const root = document.querySelector('[data-calculator-root]');
   if (!configEl || !root) return;
@@ -10,9 +10,75 @@
     return;
   }
 
-  const data = config.data || {};
+  let data = config.data || null;
   const ui = config.ui || {};
-  if (!data.brainrots || data.brainrots.length === 0) return;
+
+  const chunkPromises = new Map();
+
+  async function fetchJson(url) {
+    const response = await fetch(url, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error(`Catalog request failed: ${response.status}`);
+    return response.json();
+  }
+
+  function showCatalogError(error) {
+    console.error('SAB calculator catalog failed', error);
+    const message = document.createElement('p');
+    message.className = 'sab-calc-catalog-error';
+    message.textContent = 'Calculator data could not be loaded. Please refresh and try again.';
+    root.prepend(message);
+  }
+
+  async function loadCatalog() {
+    if (data?.brainrots?.length) return;
+    const manifestUrl = config.catalogManifestUrl;
+    if (!manifestUrl) throw new Error('Calculator catalog URL is missing.');
+    const manifest = await fetchJson(manifestUrl);
+    const bootstrap = await fetchJson(manifest.bootstrap);
+    data = {
+      ...bootstrap,
+      brainrots: bootstrap.brainrots || bootstrap.items || [],
+      manifest,
+    };
+  }
+
+  try {
+    await loadCatalog();
+  } catch (error) {
+    showCatalogError(error);
+    return;
+  }
+
+  if (!data.brainrots || data.brainrots.length === 0) {
+    showCatalogError(new Error('Calculator catalog is empty.'));
+    return;
+  }
+
+  function findBrainrot(item) {
+    const slug = item?.brainrot?.slug || item?.slug;
+    const id = item?.brainrot?.id || item?.id;
+    return data.brainrots.find((row) => row.slug === slug || String(row.id) === String(id)) || null;
+  }
+
+  async function loadBrainrotDetails(indexItem) {
+    if (!indexItem) throw new Error('Brainrot is missing from the catalog.');
+    if (Array.isArray(indexItem.mutations)) return indexItem;
+    const chunkId = String(indexItem.chunk || '');
+    const chunkUrl = data.manifest?.chunks?.[chunkId];
+    if (!chunkUrl) throw new Error(`Catalog chunk is missing: ${chunkId}`);
+    if (!chunkPromises.has(chunkId)) {
+      chunkPromises.set(chunkId, fetchJson(chunkUrl).then((payload) => {
+        (payload.brainrots || []).forEach((row) => {
+          const target = data.brainrots.find((item) => item.slug === row.slug || String(item.id) === String(row.id));
+          if (target) Object.assign(target, row);
+        });
+        return payload;
+      }));
+    }
+    await chunkPromises.get(chunkId);
+    if (!Array.isArray(indexItem.mutations)) throw new Error(`Catalog item is missing details: ${indexItem.slug}`);
+    return indexItem;
+  }
 
   const rotTheme = root.dataset.calculatorTheme === 'rot';
   const layout = root.dataset.builderLayout === 'grid' ? 'grid' : 'cards';
@@ -360,12 +426,12 @@
     updatePublishReady();
   }
 
-  function openModal(side, index = null) {
+  async function openModal(side, index = null) {
     state.modalSide = side;
     state.editIndex = index;
     const existing = index === null ? null : state[side][index];
     state.selected = existing?.brainrot || data.brainrots[0];
-    state.mutation = existing?.mutation || state.selected.mutations[0];
+    state.mutation = existing?.mutation || null;
     state.traits = existing ? [...existing.traits] : [];
     if (searchBrainrot) searchBrainrot.value = '';
     if (searchTrait) searchTrait.value = '';
@@ -374,7 +440,19 @@
     document.body.classList.add('sab-calc-modal-open');
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
-    renderModal(index === null);
+    if (index === null) {
+      renderModal(true);
+      return;
+    }
+
+    try {
+      state.selected = await loadBrainrotDetails(state.selected);
+      state.mutation = existing?.mutation || state.selected.mutations[0];
+      renderModal(false);
+    } catch (error) {
+      showCatalogError(error);
+      closeModal();
+    }
   }
 
   function closeModal() {
@@ -457,11 +535,21 @@
       if (item.rarityColor) rarity.style.color = item.rarityColor;
       rarity.textContent = item.rarity || '';
       btn.appendChild(rarity);
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         state.selected = item;
-        state.mutation = item.mutations[0];
         state.traits = [];
-        renderModal(false);
+        btn.disabled = true;
+        try {
+          const detailedBrainrot = await loadBrainrotDetails(item);
+          if (state.selected !== item) return;
+          state.selected = detailedBrainrot;
+          state.mutation = state.selected.mutations[0];
+          renderModal(false);
+        } catch (error) {
+          showCatalogError(error);
+        } finally {
+          btn.disabled = false;
+        }
       });
       brainrotGrid.appendChild(btn);
     });
@@ -662,25 +750,27 @@
     }));
   }
 
-  function hydrateItems(items) {
+  async function hydrateItems(items) {
     if (!Array.isArray(items)) return [];
-    return items.map((item) => {
-      const slug = item?.brainrot?.slug || item?.slug;
-      const brainrot = data.brainrots.find((row) => row.slug === slug || row.id === item?.brainrot?.id);
+    const hydrated = await Promise.all(items.map(async (item) => {
+      const brainrot = findBrainrot(item);
       if (!brainrot) return null;
-      const mutation = brainrot.mutations.find((row) => row.id === item.mutation?.id || row.name === item.mutation?.name)
+      const detailedBrainrot = await loadBrainrotDetails(brainrot);
+      const mutation = detailedBrainrot.mutations.find((row) => row.id === item.mutation?.id || row.name === item.mutation?.name)
         || item.mutation
-        || brainrot.mutations[0];
+        || detailedBrainrot.mutations[0];
       const traits = (item.traits || []).map((trait) => (
         (data.traits || []).find((row) => row.id === trait.id || row.name === trait.name) || trait
       ));
       return {
-        brainrot,
+        brainrot: detailedBrainrot,
         mutation,
         traits,
         quantity: Math.max(1, Number(item.quantity) || 1),
       };
-    }).filter(Boolean).slice(0, maxItems);
+    }));
+
+    return hydrated.filter(Boolean).slice(0, maxItems);
   }
 
   function persistDraft() {
@@ -703,14 +793,14 @@
     }
   }
 
-  function restoreDraft() {
+  async function restoreDraft() {
     if (layout !== 'grid') return;
     try {
       const raw = window.localStorage.getItem(draftKey);
       if (!raw) return;
       const draft = JSON.parse(raw);
-      state.offer = hydrateItems(draft.offer);
-      state.receive = hydrateItems(draft.receive);
+      state.offer = await hydrateItems(draft.offer);
+      state.receive = await hydrateItems(draft.receive);
     } catch (error) {
       // Ignore bad drafts.
     }
@@ -893,18 +983,23 @@
   });
 
   renderHelpSection();
-  restoreDraft();
+  await restoreDraft();
 
   const initialSlug = new URLSearchParams(window.location.search).get('item');
   if (initialSlug && !state.offer.length) {
     const brainrot = data.brainrots.find(b => b.slug === initialSlug);
     if (brainrot) {
-      state.offer.push({
-        brainrot,
-        mutation: brainrot.mutations[0],
-        traits: [],
-        quantity: 1,
-      });
+      try {
+        const detailedBrainrot = await loadBrainrotDetails(brainrot);
+        state.offer.push({
+          brainrot: detailedBrainrot,
+          mutation: detailedBrainrot.mutations[0],
+          traits: [],
+          quantity: 1,
+        });
+      } catch (error) {
+        showCatalogError(error);
+      }
     }
   }
 

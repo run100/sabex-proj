@@ -14,7 +14,7 @@ class PostController extends Controller
 
     public function create(SabRenderService $sabRender): View
     {
-        $context = array_merge($sabRender->calculatorViewContext(), $this->page([
+        $context = array_merge($sabRender->tradeBuilderViewContext(), $this->page([
             'tradePublishUrl' => TradePaths::apiTrades(),
             'canonical' => TradeCanonical::absolute(TradePaths::create()),
             'robots' => 'index,follow',
