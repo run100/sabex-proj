@@ -34,7 +34,7 @@
 <script src="/static/vendor/vue-sonner/vue-sonner.umd.prod.js"></script>
 <script src="/static/js/trades-ui.js?v={{ filemtime(public_path('static/js/trades-ui.js')) }}"></script>
 @yield('scripts')
-<script src="/static/js/sab-nav-auth.js" defer></script>
+<script src="/static/js/sab-nav-auth.js?v={{ filemtime(public_path('static/js/sab-nav-auth.js')) }}" defer></script>
 <script src="/static/js/trades-card.js" defer></script>
 <script src="/static/js/trades-toast.js?v={{ filemtime(public_path('static/js/trades-toast.js')) }}" defer></script>
 <script>

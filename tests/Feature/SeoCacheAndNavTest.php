@@ -187,6 +187,8 @@ class SeoCacheAndNavTest extends TestCase
                 ->assertSee('sab-main-nav sab-main-nav--desktop', false)
                 ->assertSee('sab-main-nav sab-main-nav--compact', false)
                 ->assertSee('sab-trading-nav', false)
+                ->assertSee('data-trades-nav-count', false)
+                ->assertSee('sab-nav-badge--count', false)
                 ->assertSee('sab-nav-badge--hot', false)
                 ->assertSee('sab-nav-badge--new', false)
                 ->assertSee('sab-bottom-nav', false)
@@ -232,6 +234,7 @@ class SeoCacheAndNavTest extends TestCase
             preg_match('/class="sab-main-nav sab-main-nav--desktop"[^>]*>(.*?)<\/nav>/s', $response->getContent(), $desktopNav);
             $this->assertNotSame('', $desktopNav[1] ?? '');
             $this->assertStringContainsString('sab-trading-nav', $desktopNav[1]);
+            $this->assertStringContainsString('data-trades-nav-count', $desktopNav[1]);
             $this->assertStringNotContainsString('Exist Count Gallery', $desktopNav[1]);
         }
 
@@ -241,6 +244,10 @@ class SeoCacheAndNavTest extends TestCase
         $this->assertSame(1, preg_match('/function renderHeader[\s\S]+function renderDrawer/', $navJs, $headerFn));
         $this->assertStringContainsString('function quickLinks(openCount)', $navJs);
         $this->assertStringContainsString('function tradesBadge(openCount)', $navJs);
+        $this->assertStringContainsString('function renderTradesNavCount(openCount)', $navJs);
+        $this->assertStringContainsString('function ensureTradesNavCountEls()', $navJs);
+        $this->assertStringContainsString('data-trades-nav-count', $navJs);
+        $this->assertStringContainsString('sab-nav-badge--count', $navJs);
         $this->assertStringContainsString('open_listings_count', $navJs);
         $this->assertStringContainsString('Trades, ', $navJs);
         $this->assertStringContainsString("icon('calculator')", $navJs);

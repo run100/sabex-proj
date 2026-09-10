@@ -57,6 +57,7 @@
             <path d="M7 8h11l-3-3M17 16H6l3 3"/>
           </svg>
           Trade Ads
+          <span class="sab-nav-badge sab-nav-badge--count sab-trading-nav__count" data-trades-nav-count hidden></span>
           <svg class="sab-trading-nav__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="m6 9 6 6 6-6"/>
           </svg>
@@ -442,6 +443,19 @@
     background: #06b6d4;
     color: #042f2e;
     box-shadow: 0 1px 4px rgba(8, 47, 73, .4);
+  }
+  .sab-nav-badge--count {
+    flex-shrink: 0;
+    min-width: 1.15rem;
+    padding: .15rem .35rem;
+    background: var(--sab-blue, #3b82f6);
+    color: #fff;
+    font-size: 11px;
+    line-height: 1.1;
+    box-shadow: 0 1px 4px rgba(8, 47, 73, .4);
+  }
+  .sab-nav-badge--count[hidden] {
+    display: none;
   }
   @media (min-width: 768px) {
     .sab-site-header__logo {

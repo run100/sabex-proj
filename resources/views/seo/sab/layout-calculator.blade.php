@@ -18,6 +18,6 @@
 @include('seo.sab.partials._bottom-nav')
 @include('seo.sab.partials._footer-calculator')
 @yield('scripts')
-<script src="/static/js/sab-nav-auth.js" defer></script>
+<script src="/static/js/sab-nav-auth.js?v={{ filemtime(public_path('static/js/sab-nav-auth.js')) }}" defer></script>
 </body>
 </html>

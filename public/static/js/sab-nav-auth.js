@@ -79,10 +79,44 @@
 
   window.openSabAuthModal = openAuthModal;
 
-  function tradesBadge(openCount) {
+  function tradesCountLabel(openCount) {
     var count = Number(openCount) || 0;
     if (count <= 0) return '';
-    return '<span class="sab-nav-auth__badge">' + (count > 99 ? '99+' : count) + '</span>';
+    return count > 99 ? '99+' : String(count);
+  }
+
+  function tradesBadge(openCount) {
+    var label = tradesCountLabel(openCount);
+    if (!label) return '';
+    return '<span class="sab-nav-auth__badge">' + label + '</span>';
+  }
+
+  function ensureTradesNavCountEls() {
+    var nodes = document.querySelectorAll('[data-trades-nav-count]');
+    if (nodes.length) return nodes;
+    document.querySelectorAll('[data-sab-trading-nav] .sab-trading-nav__trigger').forEach(function (trigger) {
+      var el = document.createElement('span');
+      el.className = 'sab-nav-badge sab-nav-badge--count sab-trading-nav__count';
+      el.setAttribute('data-trades-nav-count', '');
+      el.hidden = true;
+      var chevron = trigger.querySelector('.sab-trading-nav__chevron');
+      if (chevron) trigger.insertBefore(el, chevron);
+      else trigger.appendChild(el);
+    });
+    return document.querySelectorAll('[data-trades-nav-count]');
+  }
+
+  function renderTradesNavCount(openCount) {
+    var label = tradesCountLabel(openCount);
+    ensureTradesNavCountEls().forEach(function (el) {
+      if (!label) {
+        el.textContent = '';
+        el.hidden = true;
+        return;
+      }
+      el.textContent = label;
+      el.hidden = false;
+    });
   }
 
   function tradesLabel(openCount) {
@@ -200,6 +234,7 @@
     var openCount = payload && payload.open_listings_count ? Number(payload.open_listings_count) : 0;
     window.__sabMe = { user: user, unread_count: unread, open_listings_count: openCount };
     renderHeader(document.querySelector('[data-nav-auth]'), user, unread, openCount);
+    renderTradesNavCount(openCount);
     renderDrawer(document.querySelector('[data-nav-auth-drawer]'), user, unread);
     renderBar(document.querySelector('[data-nav-auth-bar]'), user, unread);
     window.dispatchEvent(new CustomEvent('sab-nav-auth', { detail: window.__sabMe }));

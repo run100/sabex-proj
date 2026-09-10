@@ -17,7 +17,7 @@
   </svg>
 </button>
 @yield('scripts')
-<script src="/static/js/sab-nav-auth.js" defer></script>
+<script src="/static/js/sab-nav-auth.js?v={{ filemtime(public_path('static/js/sab-nav-auth.js')) }}" defer></script>
 <script>
   (function () {
     var button = document.querySelector('[data-sab-back-to-top]');
