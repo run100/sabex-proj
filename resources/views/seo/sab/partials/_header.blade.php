@@ -95,7 +95,11 @@
     </nav>
     <div class="sab-header-end">
       <div class="sab-nav-auth" data-nav-auth data-login-href="{{ $loginHref }}">
-        <a href="{{ $loginHref }}" class="sab-nav-auth__signin" data-nav-sign-in>Login</a>
+        <span class="sab-nav-auth__loading" data-nav-auth-loading aria-busy="true" aria-label="Loading account">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="42" stroke-dashoffset="16"/>
+          </svg>
+        </span>
       </div>
       @if(!empty($languageLinks ?? []))
       @php
@@ -183,6 +187,22 @@
     align-items: center;
     gap: .55rem;
     flex-shrink: 0;
+  }
+  .sab-nav-auth__loading {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 4.4rem;
+    min-height: 2.15rem;
+    color: #67e8f9;
+  }
+  .sab-nav-auth__loading svg {
+    width: 1.75rem;
+    height: 1.75rem;
+    animation: sab-nav-auth-spin .8s linear infinite;
+  }
+  @keyframes sab-nav-auth-spin {
+    to { transform: rotate(360deg); }
   }
   .sab-nav-auth__signin {
     display: inline-flex;

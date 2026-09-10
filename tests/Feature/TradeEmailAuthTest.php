@@ -326,7 +326,8 @@ class TradeEmailAuthTest extends TestCase
             ->assertOk()
             ->assertSee('/static/js/sab-nav-auth.js', false)
             ->assertSee('data-nav-sign-in', false)
-            ->assertSee('>Login</a>', false)
+            ->assertSee('data-nav-auth-loading', false)
+            ->assertSee('<span>Login</span>', false)
             ->assertDontSee('trades-header-account', false);
     }
 

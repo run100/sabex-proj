@@ -205,7 +205,10 @@ class SeoCacheAndNavTest extends TestCase
                 ->assertSee('More')
                 ->assertSee('Codes')
                 ->assertSee('Exist Count List')
-                ->assertSee('>Login</a>', false)
+                ->assertSee('<span>Login</span>', false)
+                ->assertSee('data-nav-auth-loading', false)
+                ->assertSee('sab-nav-auth__loading', false)
+                ->assertSee('aria-label="Loading account"', false)
                 ->assertSee(SabRenderService::PAGE_CODES, false)
                 ->assertSee(SabRenderService::PAGE_VALUE_LIST, false)
                 ->assertSee('/wiki', false)
@@ -220,6 +223,11 @@ class SeoCacheAndNavTest extends TestCase
                 ->assertSee('>View Trade Ads</span>', false)
                 ->assertDontSee('>Post</span>', false)
                 ->assertDontSee('>Activity</span>', false);
+
+            preg_match('/<div class="sab-nav-auth"[^>]*>(.*?)<\/div>/s', $response->getContent(), $authSlot);
+            $this->assertNotSame('', $authSlot[1] ?? '');
+            $this->assertStringContainsString('data-nav-auth-loading', $authSlot[1]);
+            $this->assertStringNotContainsString('Login', $authSlot[1]);
 
             preg_match('/class="sab-main-nav sab-main-nav--desktop"[^>]*>(.*?)<\/nav>/s', $response->getContent(), $desktopNav);
             $this->assertNotSame('', $desktopNav[1] ?? '');
@@ -255,9 +263,14 @@ class SeoCacheAndNavTest extends TestCase
         $this->assertStringContainsString('Profile', $headerFn[0]);
         $this->assertStringContainsString('Sign out', $headerFn[0]);
         $this->assertStringContainsString('data-nav-sign-out', $headerFn[0]);
+        $this->assertStringContainsString('sab-nav-auth__signin', $headerFn[0]);
+        $this->assertStringContainsString('>Login</a>', $headerFn[0]);
         $this->assertStringNotContainsString('Last seen', $headerFn[0]);
         $headerView = (string) file_get_contents(resource_path('views/seo/sab/partials/_header.blade.php'));
         $this->assertStringContainsString('.sab-account-nav__menu', $headerView);
+        $this->assertStringContainsString('.sab-nav-auth__loading', $headerView);
+        $this->assertStringContainsString('data-nav-auth-loading', $headerView);
+        $this->assertStringContainsString('sab-nav-auth-spin', $headerView);
         $this->assertStringContainsString('.sab-nav-auth__quick-link', $headerView);
         $this->assertStringContainsString('.sab-nav-auth__quick-link--calculator svg', $headerView);
         $this->assertStringContainsString('.sab-nav-auth__link.is-active', $headerView);
@@ -313,7 +326,7 @@ class SeoCacheAndNavTest extends TestCase
                 ->assertSee('border: 1px solid rgba(148, 163, 184, 0.4)')
                 ->assertSee('Email login')
                 ->assertSee('Create an account')
-                ->assertSee('>Login</a>', false);
+                ->assertSee('<span>Login</span>', false);
         }
     }
 
@@ -330,7 +343,10 @@ class SeoCacheAndNavTest extends TestCase
 
         $this->assertStringContainsString('data-roblox-auth-modal', $html);
         $this->assertStringContainsString('Calculator', $html);
-        $this->assertStringContainsString('>Login</a>', $html);
+        $this->assertStringContainsString('data-nav-auth-loading', $html);
+        $this->assertStringContainsString('sab-nav-auth__loading', $html);
+        preg_match('/<div class="sab-nav-auth"[^>]*>(.*?)<\/div>/s', $html, $authSlot);
+        $this->assertStringNotContainsString('Login', $authSlot[1] ?? '');
         $this->assertStringNotContainsString('name="csrf-token"', $html);
         $this->assertStringNotContainsString('_token', $html);
     }
