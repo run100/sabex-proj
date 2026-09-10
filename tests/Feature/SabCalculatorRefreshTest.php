@@ -374,6 +374,40 @@ class SabCalculatorRefreshTest extends TestCase
         $this->assertFileExists(SabCalculatorCatalogService::releaseBootstrapPath($firstVersion));
     }
 
+    public function test_catalog_command_keeps_previous_manifest_when_local_catalog_is_empty(): void
+    {
+        $site = SeoSite::query()->create([
+            'slug' => SabRenderService::SITE_SLUG,
+            'name' => 'SAB',
+            'settings_json' => [],
+        ]);
+        SeoGame::query()->create([
+            'seo_site_id' => $site->id,
+            'slug' => 'steal-a-brainrot',
+            'name' => 'Steal a Brainrot',
+        ]);
+
+        $oldVersion = '20260909000000-previous';
+        $oldManifest = [
+            'schema_version' => 1,
+            'version' => $oldVersion,
+            'counts' => ['items' => 531, 'mutations' => 3949, 'chunks' => 9],
+        ];
+        $oldBootstrapPath = SabCalculatorCatalogService::releaseBootstrapPath($oldVersion);
+        File::ensureDirectoryExists(dirname($oldBootstrapPath));
+        File::put($oldBootstrapPath, '{"items":[{"slug":"previous-item"}]}');
+        File::ensureDirectoryExists(dirname(SabCalculatorCatalogService::manifestPath()));
+        File::put(SabCalculatorCatalogService::manifestPath(), json_encode($oldManifest));
+
+        Http::preventStrayRequests();
+        $this->artisan('seo:sab-calculator-catalog')
+            ->expectsOutput('Calculator catalog is empty; previous manifest was kept.')
+            ->assertFailed();
+
+        $this->assertSame($oldManifest, json_decode((string) File::get(SabCalculatorCatalogService::manifestPath()), true));
+        $this->assertFileExists($oldBootstrapPath);
+    }
+
     private function createSeoTables(): void
     {
         foreach ([

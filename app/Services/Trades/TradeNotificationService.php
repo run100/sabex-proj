@@ -88,7 +88,7 @@ class TradeNotificationService
             if ($quota['remaining'] < 1) {
                 throw TradeException::conflict(
                     'MESSAGE_LIMIT_REACHED',
-                    'You can send at most '.$quota['limit'].' messages or trade requests to this user.'
+                    'You can send at most '.$quota['limit'].' messages or trade requests on this trade.'
                 );
             }
 

@@ -159,6 +159,10 @@ class SabCalculatorCatalogService
             $this->progress($onProgress, 'Catalog chunk '.$chunkId.' written in memory: '.count($chunks[$chunkId]).' items.');
         }
 
+        if ($index === []) {
+            throw new \RuntimeException('Calculator catalog is empty; previous manifest was kept.');
+        }
+
         $syncedAt ??= now()->toIso8601String();
         $meta = $this->readMeta();
         $chunkIds = array_keys($chunks);

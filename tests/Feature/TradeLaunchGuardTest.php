@@ -195,22 +195,22 @@ class TradeLaunchGuardTest extends TestCase
             ->assertSee('https://sabexistcount.com/trading/new');
     }
 
-    public function test_trade_create_temporarily_hides_listing_note_and_builder_payload(): void
+    public function test_trade_create_exposes_listing_note_and_builder_payload(): void
     {
         $this->get('http://www.sabex.lab/trading/new')
             ->assertOk()
-            ->assertDontSee('Add a note')
-            ->assertDontSee('trade-note', false)
-            ->assertDontSee('data-trade-note', false)
-            ->assertDontSee('data-note-count', false);
+            ->assertSee('Add a note')
+            ->assertSee('trade-note', false)
+            ->assertSee('data-trade-note', false)
+            ->assertSee('data-note-count', false);
 
         $builder = file_get_contents(public_path('static/js/sab-trade-builder.js'));
         $this->assertIsString($builder);
-        $this->assertStringNotContainsString('noteInput', $builder);
-        $this->assertStringNotContainsString('noteCount', $builder);
-        $this->assertStringNotContainsString('data-trade-note', $builder);
-        $this->assertStringNotContainsString('draft.note', $builder);
-        $this->assertStringNotContainsString('note:', $builder);
+        $this->assertStringContainsString('noteInput', $builder);
+        $this->assertStringContainsString('noteCount', $builder);
+        $this->assertStringContainsString('data-trade-note', $builder);
+        $this->assertStringContainsString('draft.note', $builder);
+        $this->assertStringContainsString('note,', $builder);
     }
 
     public function test_hidden_listing_is_404(): void

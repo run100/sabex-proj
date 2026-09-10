@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Exceptions\TradeException;
 use App\Models\SeoItem;
+use App\Models\TradeConfirmation;
 use App\Models\TradeEvent;
 use App\Models\TradeJoinRequest;
 use App\Models\TradeListing;
@@ -86,6 +87,54 @@ class TradesBoardTest extends TestCase
         $this->get('http://www.sabex.lab/trading/'.$listing->public_id)
             ->assertOk()
             ->assertSee($listing->public_id);
+    }
+
+    public function test_listing_and_confirmation_notes_reject_markup_and_keep_sql_as_text(): void
+    {
+        $owner = $this->tradeUser('12346', 'NoteOwner');
+        $buyer = $this->tradeUser('12347', 'NoteBuyer');
+
+        $this->actingAs($owner, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades', [
+                'offering' => [['slug' => 'noobini']],
+                'looking_for' => [['slug' => 'cappuccino']],
+                'note' => '<script>alert(1)</script>',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'INVALID_MESSAGE');
+        $this->assertSame(0, TradeListing::query()->where('owner_user_id', $owner->id)->count());
+
+        $listing = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
+        $join = $this->actingAs($buyer, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/join')
+            ->assertCreated()
+            ->json('data.join_request');
+
+        $this->actingAs($owner, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/join-requests/'.$join['public_id'].'/accept')
+            ->assertOk();
+
+        $confirmUrl = 'http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/confirm';
+        $this->actingAs($buyer, 'trades')
+            ->postJson($confirmUrl, [
+                'confirmation' => 'completed',
+                'note' => '<div>blocked</div>',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'INVALID_MESSAGE');
+        $this->assertSame(0, TradeConfirmation::query()->where('listing_id', $listing->id)->count());
+
+        $sqlNote = '; DROP TABLE seo_trade_confirmations; --';
+        $this->actingAs($buyer, 'trades')
+            ->postJson($confirmUrl, [
+                'confirmation' => 'completed',
+                'note' => $sqlNote,
+            ])
+            ->assertOk();
+        $this->assertSame($sqlNote, TradeConfirmation::query()
+            ->where('listing_id', $listing->id)
+            ->where('user_id', $buyer->id)
+            ->value('note'));
     }
 
     public function test_user_can_post_two_trades_per_utc_day(): void
@@ -721,7 +770,7 @@ class TradesBoardTest extends TestCase
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'MESSAGE_LIMIT_REACHED');
 
-        $this->assertSame(1, TradeJoinRequest::query()
+        $this->assertSame(2, TradeJoinRequest::query()
             ->where('requester_user_id', $buyer->id)
             ->where('owner_user_id', $owner->id)
             ->count());
@@ -733,29 +782,36 @@ class TradesBoardTest extends TestCase
             ->count());
     }
 
-    public function test_two_join_requests_block_chat_and_empty_note_remains_allowed(): void
+    public function test_contact_quota_is_per_listing_and_empty_join_note_remains_allowed(): void
     {
         $owner = $this->tradeUser('55522', 'TwoJoinOwner');
         $buyer = $this->tradeUser('55523', 'TwoJoinBuyer');
         $first = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
         $second = app(TradeListingService::class)->create($owner, [['slug' => 'noobini']], [['slug' => 'cappuccino']]);
 
-        foreach ([$first, $second] as $listing) {
-            $this->actingAs($buyer, 'trades')
-                ->postJson('http://www.sabex.lab/api/v1/trading/trades/'.$listing->public_id.'/join')
-                ->assertCreated();
-        }
+        $firstJoinUrl = 'http://www.sabex.lab/api/v1/trading/trades/'.$first->public_id.'/join';
+        $join = $this->actingAs($buyer, 'trades')
+            ->postJson($firstJoinUrl)
+            ->assertCreated()
+            ->json('data.join_request');
+        $this->assertNull($join['note']);
+        $joinRequest = TradeJoinRequest::query()->where('public_id', $join['public_id'])->firstOrFail();
+        $joinRequest->status = TradeJoinRequest::STATUS_REJECTED;
+        $joinRequest->rejected_at = now();
+        $joinRequest->save();
 
         $messageUrl = 'http://www.sabex.lab/api/v1/trading/trades/'.$first->public_id.'/messages';
-        $this->actingAs($buyer, 'trades')
-            ->postJson($messageUrl, ['message' => 'No chat after two joins'])
-            ->assertStatus(409)
-            ->assertJsonPath('error.code', 'MESSAGE_LIMIT_REACHED');
+        foreach (['Message one', 'Message two', 'Message three', 'Message four'] as $message) {
+            $this->actingAs($buyer, 'trades')
+                ->postJson($messageUrl, ['message' => $message])
+                ->assertCreated();
+        }
 
         $this->actingAs($buyer, 'trades')
             ->getJson($messageUrl)
             ->assertOk()
-            ->assertJsonPath('data.contact_quota.sent', 2)
+            ->assertJsonPath('data.contact_quota.limit', 5)
+            ->assertJsonPath('data.contact_quota.sent', 5)
             ->assertJsonPath('data.contact_quota.remaining', 0);
 
         $this->actingAs($buyer, 'trades')
@@ -764,9 +820,23 @@ class TradesBoardTest extends TestCase
             ->assertSee('data-contact-remaining="0"', false);
 
         $this->actingAs($buyer, 'trades')
-            ->postJson('http://www.sabex.lab/api/v1/trading/trades/'.$first->public_id.'/join', [
-                'note' => str_repeat('a', 281),
-            ])
+            ->postJson($firstJoinUrl, ['note' => 'Sixth interaction'])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'JOIN_LIMIT_REACHED');
+
+        $secondJoinUrl = 'http://www.sabex.lab/api/v1/trading/trades/'.$second->public_id.'/join';
+        $this->actingAs($buyer, 'trades')
+            ->postJson($secondJoinUrl)
+            ->assertCreated();
+
+        $this->actingAs($buyer, 'trades')
+            ->getJson('http://www.sabex.lab/api/v1/trading/trades/'.$second->public_id.'/messages')
+            ->assertOk()
+            ->assertJsonPath('data.contact_quota.sent', 1)
+            ->assertJsonPath('data.contact_quota.remaining', 4);
+
+        $this->actingAs($buyer, 'trades')
+            ->postJson($secondJoinUrl, ['note' => str_repeat('a', 281)])
             ->assertStatus(422)
             ->assertJsonPath('error.code', 'INVALID_MESSAGE');
 
@@ -867,10 +937,21 @@ class TradesBoardTest extends TestCase
                 'looking_for' => [['slug' => 'cappuccino']],
                 'note' => $injection,
             ])
-            ->assertCreated();
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'INVALID_MESSAGE');
+
+        $listingSqlText = '; DROP TABLE seo_trade_users; --';
+        $this->actingAs($submitter, 'trades')
+            ->postJson('http://www.sabex.lab/api/v1/trading/trades', [
+                'offering' => [['slug' => 'noobini']],
+                'looking_for' => [['slug' => 'cappuccino']],
+                'note' => $listingSqlText,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.trade.note', $listingSqlText);
 
         $submitted = TradeListing::query()->where('owner_user_id', $submitter->id)->latest('id')->firstOrFail();
-        $this->assertNull($submitted->note);
+        $this->assertSame($listingSqlText, $submitted->note);
 
         $messageUrl = 'http://www.sabex.lab/api/v1/trading/trades/'.$older->public_id.'/messages';
         $this->actingAs($buyer, 'trades')
@@ -1349,7 +1430,6 @@ class TradesBoardTest extends TestCase
     public function test_activity_paginates_newest_first_and_keeps_status(): void
     {
         $this->raiseTradePostLimits();
-        config(['sab-trades.contact_limit_per_user' => 50]);
         $owner = $this->tradeUser('63', 'ActiveOwner');
         $buyer = $this->tradeUser('64', 'ActiveBuyer');
         [$oldest, $newest] = $this->createNumberedListings($owner, 21);

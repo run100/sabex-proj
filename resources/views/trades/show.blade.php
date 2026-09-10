@@ -553,7 +553,7 @@
   }
 
   function isTradeNormalText(value) {
-    return /^[\p{L}\p{M}\p{N}\p{Zs}\r\n.,!?;:'\"()\-_\/，。！？；：、（）「」『』【】《》〈〉…—–·]+$/u.test(value);
+    return /^[\p{L}\p{M}\p{N}\p{Zs}\r\n.,!?;:'"()\-_\/，。！？；：、（）「」『』【】《》〈〉…—–·]+$/u.test(value);
   }
 
 @if($canMessage)
@@ -591,7 +591,7 @@
         button.disabled = Boolean(exhausted);
       });
       if (exhausted) {
-        error.textContent = `You can send at most ${contactLimit} messages or trade requests to this user.`;
+        error.textContent = `You can send at most ${contactLimit} messages or trade requests on this trade.`;
       }
     }
 
@@ -696,7 +696,7 @@
       if (noteInput) noteInput.disabled = Boolean(exhausted);
       if (submitButton) submitButton.disabled = Boolean(exhausted);
       if (exhausted && error) {
-        error.textContent = `You can send at most ${contactLimit} messages or trade requests to this user.`;
+        error.textContent = `You can send at most ${contactLimit} messages or trade requests on this trade.`;
       }
     }
 
