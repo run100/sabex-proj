@@ -11,6 +11,7 @@
 
   gtag('config', 'G-9D736VVHH3');
 </script>
+@include('seo.sab.partials._plausible')
 <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" as="style" />

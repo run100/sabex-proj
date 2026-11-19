@@ -386,6 +386,49 @@ class SeoCacheAndNavTest extends TestCase
         $this->assertStringNotContainsString('Create a Trade', $html);
         $this->assertStringNotContainsString('View Trades', $html);
         $this->assertStringNotContainsString('sab-calc-trade-pills', $html);
+        $this->assertStringContainsString('pa-NUDSkavkE3bg6gznQg0cC.js', $html);
+    }
+
+    public function test_public_layouts_include_plausible(): void
+    {
+        $script = 'pa-NUDSkavkE3bg6gznQg0cC.js';
+        $shared = [
+            'locale' => 'en',
+            'seoTitle' => 'SAB',
+            'seoDescription' => 'Counts',
+            'canonical' => 'http://www.sabex.lab/',
+            'urlPrefix' => '',
+            'hreflangLinks' => [],
+            'languageLinks' => [],
+        ];
+
+        $main = view('seo.sab.layout', $shared + [
+            't' => [
+                'footer_copyright_rest' => 'SAB Exist Count',
+                'footer_home' => 'Home',
+                'footer_about' => 'About',
+                'footer_privacy' => 'Privacy',
+                'footer_terms' => 'Terms',
+                'footer_disclaimer' => 'Disclaimer',
+            ],
+        ])->render();
+
+        $calculator = view('seo.sab.layout-calculator', $shared + [
+            't' => [],
+            'calculatorOnly' => true,
+            'brand' => [
+                'logo_html' => 'SABCalculator',
+                'og_site_name' => 'SAB Calculator',
+                'site_name' => 'SAB Calculator',
+            ],
+            'cssHref' => '/static/css/sabcalculator.css',
+        ])->render();
+
+        $this->assertStringContainsString($script, $main);
+        $this->assertStringContainsString('https://plausible.io', $main);
+        $this->assertStringContainsString($script, $calculator);
+        $this->assertSame(1, substr_count($main, $script));
+        $this->assertSame(1, substr_count($calculator, $script));
     }
 
     private function assertPublicSeoCdn($response): void

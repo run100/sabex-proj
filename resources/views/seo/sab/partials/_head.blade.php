@@ -9,6 +9,8 @@
 <link rel="dns-prefetch" href="https://pagead2.googlesyndication.com" />
 <link rel="preconnect" href="https://pagead2.googlesyndication.com" crossorigin />
 <link rel="dns-prefetch" href="https://pagead2.googlesyndication.com" />
+<link rel="preconnect" href="https://plausible.io" crossorigin />
+<link rel="dns-prefetch" href="https://plausible.io" />
 <link rel="preload" href="{{ $cssHref ?? \App\Services\Seo\SabRenderService::CSS_HREF_LARAVEL }}" as="style" />
 
 <title>{{ $seoTitle }}</title>
@@ -62,6 +64,7 @@
     }
   })();
 </script>
+@include('seo.sab.partials._plausible')
 
 {{-- Microsoft Clarity --}}
 <script type="text/javascript">
